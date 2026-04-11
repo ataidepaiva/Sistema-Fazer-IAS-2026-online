@@ -10,6 +10,25 @@ interface Registro {
   data: string
 }
 
+function obterDataAtualBrasil(): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(new Date())
+}
+
+function normalizarData(data: string | undefined): string {
+  const valor = (data || "").trim()
+
+  if (!valor || valor.toLowerCase() === "undefined") {
+    return obterDataAtualBrasil()
+  }
+
+  return valor
+}
+
 async function mesclarDocs(buffers: Buffer[]) {
   const { default: DocxMerger } = await import("docx-merger")
 
@@ -38,7 +57,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "Nenhum registro informado" }, { status: 400 })
   }
 
-  const docs = registros.map((item: Registro) => gerarDoc("modelo.docx", item))
+  const registrosComData = registros.map((item: Registro) => ({
+    ...item,
+    data_atual: obterDataAtualBrasil()
+  }))
+
+  const docs = registrosComData.map((item: Registro) => gerarDoc("modelo.docx", item))
   const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
   const payload = new Uint8Array(buffer)
 

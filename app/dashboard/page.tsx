@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -23,6 +23,28 @@ export default function Dashboard() {
   const [valorPaginaGlobal, setValorPaginaGlobal] = useState("")
   const [valorColunaGlobal, setValorColunaGlobal] = useState("")
   const [valorDataGlobal, setValorDataGlobal] = useState("")
+  const [gerandoDocumento, setGerandoDocumento] = useState(false)
+  const [progressoGeracao, setProgressoGeracao] = useState(0)
+  const [tempoDecorridoSegundos, setTempoDecorridoSegundos] = useState(0)
+  const inicioGeracaoRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!gerandoDocumento) return
+
+    const timer = window.setInterval(() => {
+      const inicio = inicioGeracaoRef.current
+      if (!inicio) return
+
+      const segundos = Math.floor((Date.now() - inicio) / 1000)
+      setTempoDecorridoSegundos(segundos)
+      setProgressoGeracao((anterior) => {
+        const estimativa = Math.min(95, Math.floor((segundos / 20) * 95))
+        return Math.max(anterior, estimativa)
+      })
+    }, 200)
+
+    return () => window.clearInterval(timer)
+  }, [gerandoDocumento])
 
   async function processar() {
     if (!texto.trim()) return
@@ -88,24 +110,43 @@ export default function Dashboard() {
   }
 
   async function gerar() {
-    const res = await fetch("/api/gerar", {
-      method: "POST",
-      body: JSON.stringify({ registros: dados }),
-    })
+    setGerandoDocumento(true)
+    setProgressoGeracao(5)
+    setTempoDecorridoSegundos(0)
+    inicioGeracaoRef.current = Date.now()
 
-    const blob = await res.blob()
-    const url = window.URL.createObjectURL(blob)
-    const tituloBase = (dados[0]?.titulo || "").trim()
-    const nomeSeguro = tituloBase
-      .replace(/[\\/:*?"<>|]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
+    try {
+      const res = await fetch("/api/gerar", {
+        method: "POST",
+        body: JSON.stringify({ registros: dados }),
+      })
 
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${nomeSeguro || "documento_unico_ias"}.docx`
-    a.click()
-    window.URL.revokeObjectURL(url)
+      if (!res.ok) {
+        throw new Error("Falha ao gerar documento")
+      }
+
+      const blob = await res.blob()
+      setProgressoGeracao(100)
+
+      const url = window.URL.createObjectURL(blob)
+      const tituloBase = (dados[0]?.titulo || "").trim()
+      const nomeSeguro = tituloBase
+        .replace(/[\\/:*?"<>|]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${nomeSeguro || "documento_unico_ias"}.docx`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } finally {
+      window.setTimeout(() => {
+        setGerandoDocumento(false)
+        setProgressoGeracao(0)
+        inicioGeracaoRef.current = null
+      }, 500)
+    }
   }
 
   const tituloTela = activeTab === "input" ? "Entrada de Dados" : activeTab === "edit" ? "Edição" : "Exportar"
@@ -393,12 +434,28 @@ export default function Dashboard() {
                 </p>
 
                 <button
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-4 px-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3 mb-8"
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-semibold py-4 px-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
                   onClick={gerar}
+                  disabled={gerandoDocumento}
                 >
                   <Download size={20} />
-                  Baixar Documento (.DOCX)
+                  {gerandoDocumento ? "Gerando documento..." : "Baixar Documento (.DOCX)"}
                 </button>
+
+                {gerandoDocumento && (
+                  <div className="w-full max-w-md mb-8">
+                    <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
+                      <span>Tempo decorrido: {tempoDecorridoSegundos}s</span>
+                      <span>{progressoGeracao}%</span>
+                    </div>
+                    <div className="h-3 w-full rounded-full bg-emerald-100 overflow-hidden border border-emerald-200">
+                      <div
+                        className="h-full bg-emerald-600 transition-all duration-200 ease-linear"
+                        style={{ width: `${progressoGeracao}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={() => setActiveTab("edit")}

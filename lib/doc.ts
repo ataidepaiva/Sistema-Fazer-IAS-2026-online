@@ -6,10 +6,9 @@ export function gerarDoc(modeloPath: string, dados: object) {
   const content = fs.readFileSync(modeloPath, "binary")
 
   const zip = new PizZip(content)
-  const doc = new Docxtemplater(zip)
+  const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })
 
-  doc.setData(dados)
-  doc.render()
+  doc.render(dados)
 
   return doc.getZip().generate({ type: "nodebuffer" })
 }

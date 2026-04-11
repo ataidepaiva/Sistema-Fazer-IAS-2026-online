@@ -8,6 +8,23 @@ function extrairMasp(texto: string): string {
   return ""
 }
 
+function normalizarTitulo(titulo: string): string {
+  return titulo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+}
+
+function ehAtoEspecial(titulo: string): boolean {
+  const tituloNormalizado = normalizarTitulo(titulo)
+  return (
+    tituloNormalizado.startsWith("RETIFICACAO") ||
+    tituloNormalizado.startsWith("ANULACAO") ||
+    tituloNormalizado.startsWith("REVOGACAO")
+  )
+}
+
 export function processarTexto(texto: string) {
   const blocos = texto.split("\n\n")
 
@@ -25,12 +42,14 @@ export function processarTexto(texto: string) {
     const linhas = bloco.trim().split("\n")
     const maspDoBloco = extrairMasp(bloco)
 
-    const titulo = linhas[0]
+    const titulo = (linhas[0] || "").trim()
     const resto = linhas.slice(1).join(" ")
 
+    const atoEspecial = ehAtoEspecial(titulo)
     const index = resto.indexOf(":")
-    const texto_base = resto.slice(0, index + 1)
-    const lista = resto.slice(index + 1)
+
+    const texto_base = atoEspecial || index === -1 ? "" : resto.slice(0, index + 1)
+    const lista = atoEspecial || index === -1 ? resto : resto.slice(index + 1)
 
     const servidores = lista
       .split(";")
