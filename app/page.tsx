@@ -46,7 +46,10 @@ export default function SREVarginha() {
 
         <div className="cta-wrap">
           <Link href="/dashboard" className="cta-btn">
-            Acessar Painel de Controle
+            Acessar Painel de Controle (IAS)
+          </Link>
+          <Link href="/lauda" className="cta-btn cta-btn-secondary">
+            Preparar Lauda para Envio
           </Link>
           <p className="cta-note">Acesso restrito a usuários autorizados</p>
         </div>
@@ -182,6 +185,12 @@ export default function SREVarginha() {
         .cta-wrap {
           text-align: center;
           margin-top: 42px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          justify-content: center;
+          align-items: center;
+          flex-direction: column;
         }
 
         .cta-btn {
@@ -199,6 +208,14 @@ export default function SREVarginha() {
 
         .cta-btn:hover {
           background: #1565c0;
+        }
+
+        .cta-btn-secondary {
+          background: #059669;
+        }
+
+        .cta-btn-secondary:hover {
+          background: #047857;
         }
 
         .cta-note {

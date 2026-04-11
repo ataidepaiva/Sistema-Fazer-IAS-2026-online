@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { FileText, Edit3, Download, ClipboardList, ArrowLeft } from "lucide-react"
+import { FileText, Edit3, Download, ClipboardList, ArrowLeft, ScrollText } from "lucide-react"
 
 interface Registro {
   titulo: string
@@ -216,6 +216,14 @@ export default function Dashboard() {
             <Download size={16} />
             Exportar
           </button>
+
+          <Link
+            href="/lauda"
+            className="text-left px-4 py-3 rounded-xl flex items-center gap-2 transition-all font-medium text-blue-100 hover:bg-blue-800/80"
+          >
+            <ScrollText size={16} />
+            Preparar Lauda
+          </Link>
         </nav>
 
         <div className="mt-auto pt-8 text-xs opacity-70">© 2026 SRE Varginha</div>
