@@ -1,3 +1,5 @@
+import "server-only"
+
 function extrairMasp(texto: string): string {
   const match = texto.match(/ma\s*sp\s*[:\-]?\s*([\d.\/-]+)/i)
 

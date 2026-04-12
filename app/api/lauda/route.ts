@@ -45,6 +45,22 @@ function obterDataParaNome(): string {
   return `${d}-${m}-${y}`
 }
 
+function obterNomeAscii(nomeArquivo: string): string {
+  return nomeArquivo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/"/g, "")
+    .trim() || "lauda.rtf"
+}
+
+function montarContentDisposition(nomeArquivo: string): string {
+  const nomeAscii = obterNomeAscii(nomeArquivo)
+  const nomeUtf8 = encodeURIComponent(nomeArquivo)
+
+  return `attachment; filename="${nomeAscii}"; filename*=UTF-8''${nomeUtf8}`
+}
+
 export async function POST(req: Request) {
   const { texto } = await req.json()
 
@@ -64,7 +80,7 @@ export async function POST(req: Request) {
   return new Response(buffer, {
     headers: {
       "Content-Type": "application/rtf",
-      "Content-Disposition": `attachment; filename="${nomeArquivo}"`,
+      "Content-Disposition": montarContentDisposition(nomeArquivo),
     },
   })
 }

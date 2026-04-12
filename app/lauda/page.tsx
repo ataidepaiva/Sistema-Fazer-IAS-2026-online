@@ -52,11 +52,13 @@ export default function Lauda() {
 
       const url = window.URL.createObjectURL(blob)
       const disposition = res.headers.get("Content-Disposition") || ""
-      const match = disposition.match(/filename="([^"]+)"/)
+      const matchUtf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const match = disposition.match(/filename="([^"]+)"/i)
+      const nomeArquivo = matchUtf8?.[1] ? decodeURIComponent(matchUtf8[1]) : match?.[1]
 
       const a = document.createElement("a")
       a.href = url
-      a.download = match?.[1] || "lauda.rtf"
+      a.download = nomeArquivo || "lauda.rtf"
       a.click()
       window.URL.revokeObjectURL(url)
     } finally {

@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("input")
   const [texto, setTexto] = useState("")
   const [dados, setDados] = useState<Registro[]>([])
+  const [erro, setErro] = useState("")
   const [valorPaginaGlobal, setValorPaginaGlobal] = useState("")
   const [valorColunaGlobal, setValorColunaGlobal] = useState("")
   const [valorDataGlobal, setValorDataGlobal] = useState("")
@@ -38,7 +39,7 @@ export default function Dashboard() {
       const segundos = Math.floor((Date.now() - inicio) / 1000)
       setTempoDecorridoSegundos(segundos)
       setProgressoGeracao((anterior) => {
-        const estimativa = Math.min(95, Math.floor((segundos / 20) * 95))
+        const estimativa = Math.min(95, Math.floor((segundos / 45) * 95))
         return Math.max(anterior, estimativa)
       })
     }, 200)
@@ -49,10 +50,19 @@ export default function Dashboard() {
   async function processar() {
     if (!texto.trim()) return
 
+    setErro("")
+
     const res = await fetch("/api/processar", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ texto }),
     })
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      setErro(json?.error || "Falha ao processar texto")
+      return
+    }
 
     const json = await res.json()
     setDados(json)
@@ -110,6 +120,7 @@ export default function Dashboard() {
   }
 
   async function gerar() {
+    setErro("")
     setGerandoDocumento(true)
     setProgressoGeracao(5)
     setTempoDecorridoSegundos(0)
@@ -118,28 +129,32 @@ export default function Dashboard() {
     try {
       const res = await fetch("/api/gerar", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ registros: dados }),
       })
 
       if (!res.ok) {
-        throw new Error("Falha ao gerar documento")
+        const json = await res.json().catch(() => null)
+        throw new Error(json?.error || "Falha ao gerar documento")
       }
 
       const blob = await res.blob()
       setProgressoGeracao(100)
 
       const url = window.URL.createObjectURL(blob)
-      const tituloBase = (dados[0]?.titulo || "").trim()
-      const nomeSeguro = tituloBase
-        .replace(/[\\/:*?"<>|]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
+      const disposition = res.headers.get("Content-Disposition") || ""
+      const matchUtf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const match = disposition.match(/filename="([^"]+)"/i)
+      const nomeArquivo = matchUtf8?.[1] ? decodeURIComponent(matchUtf8[1]) : match?.[1]
 
       const a = document.createElement("a")
       a.href = url
-      a.download = `${nomeSeguro || "documento_unico_ias"}.docx`
+      a.download = nomeArquivo || "documento_unico_ias.docx"
       a.click()
       window.URL.revokeObjectURL(url)
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : "Falha ao gerar documento"
+      setErro(mensagem)
     } finally {
       window.setTimeout(() => {
         setGerandoDocumento(false)
@@ -244,6 +259,12 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 p-5 md:p-6">
+            {erro && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {erro}
+              </div>
+            )}
+
             {activeTab === "input" && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <label className="block text-sm font-medium text-slate-600 mb-2">Folha de rascunho</label>
@@ -462,6 +483,9 @@ export default function Dashboard() {
                         style={{ width: `${progressoGeracao}%` }}
                       />
                     </div>
+                    <p className="mt-2 text-center text-xs text-slate-500">
+                      Textos muito grandes podem levar mais tempo para mesclar todas as páginas do documento.
+                    </p>
                   </div>
                 )}
 
