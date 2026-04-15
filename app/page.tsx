@@ -15,7 +15,7 @@ export default function SREVarginha() {
             <p className={styles.subtitle}>Sistema de Informativos</p>
           </div>
         </div>
-        <span className={styles.version}>v1.0</span>
+        <span className={styles.version}>v2.6</span>
       </header>
 
       <section className={styles.hero}>
@@ -44,19 +44,16 @@ export default function SREVarginha() {
         </div>
 
         <div className={styles.ctaWrap}>
-          <Link href="/dashboard" className={styles.ctaBtn}>
-            Acessar Painel de Controle (IAS)
-          </Link>
-          <Link href="/lauda" className={`${styles.ctaBtn} ${styles.ctaBtnSecondary}`}>
-            Preparar Lauda para Envio
+          <Link href="/login" className={styles.ctaBtn}>
+            Acessar Login do Sistema
           </Link>
           <p className={styles.ctaNote}>Acesso restrito a usuários autorizados</p>
         </div>
       </main>
 
       <footer className={styles.footer}>
-        <p>© 2026 Superintendência Regional de Ensino de Varginha</p>
-        <p>Sistema desenvolvido para otimização de processos administrativos</p>
+        <p>© {new Date().getFullYear()} Superintendência Regional de Ensino de Varginha</p>
+        <p>Sistema desenvolvido para otimização na produção de IAS</p>
       </footer>
     </div>
   )

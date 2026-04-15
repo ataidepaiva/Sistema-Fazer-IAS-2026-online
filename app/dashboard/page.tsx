@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { FileText, Edit3, Download, ClipboardList, ArrowLeft, ScrollText } from "lucide-react"
+import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu } from "lucide-react"
 
 interface Registro {
   titulo: string
@@ -17,6 +18,8 @@ interface Registro {
 }
 
 export default function Dashboard() {
+  const router = useRouter()
+  const [menuAberto, setMenuAberto] = useState(true)
   const [activeTab, setActiveTab] = useState("input")
   const [texto, setTexto] = useState("")
   const [dados, setDados] = useState<Registro[]>([])
@@ -119,6 +122,12 @@ export default function Dashboard() {
     elemento.style.height = `${elemento.scrollHeight}px`
   }
 
+  async function sair() {
+    await fetch("/api/logout", { method: "POST" })
+    router.push("/login")
+    router.refresh()
+  }
+
   async function gerar() {
     setErro("")
     setGerandoDocumento(true)
@@ -174,21 +183,26 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100 md:flex">
-      <aside className="w-full md:w-72 bg-gradient-to-b from-blue-900 via-blue-900 to-blue-950 text-white p-6 flex flex-col shadow-2xl">
+      <aside
+        className={cn(
+          "w-full md:w-72 bg-gradient-to-b from-blue-900 via-blue-900 to-blue-950 text-white p-6 flex flex-col shadow-2xl",
+          !menuAberto && "hidden"
+        )}
+      >
         <Link href="/" className="flex items-center gap-3 mb-8 hover:opacity-90 transition-opacity">
-          <div className="shrink-0 rounded-full bg-white p-1.5 shadow-md">
+          <div className="shrink-0 h-16 w-16 overflow-hidden rounded-full bg-white p-0.5 shadow-md">
             <Image
               src="/logo-sre-varginha.png"
               alt="Logo oficial da Superintendência Regional de Ensino de Varginha"
               width={56}
               height={56}
-              className="h-14 w-14 object-contain"
+              className="h-full w-full scale-150 object-cover"
               priority
             />
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight">SRE Varginha</h1>
-            <p className="text-xs opacity-80">SInfo v1.0</p>
+            <p className="text-xs opacity-80">SInfo v2.6</p>
           </div>
         </Link>
 
@@ -241,7 +255,7 @@ export default function Dashboard() {
           </Link>
         </nav>
 
-        <div className="mt-auto pt-8 text-xs opacity-70">© 2026 SRE Varginha</div>
+        <div className="mt-auto pt-8 text-xs opacity-70">© {new Date().getFullYear()} SRE Varginha</div>
       </aside>
 
       <main className="flex-1 p-4 md:p-6 xl:p-8">
@@ -252,10 +266,22 @@ export default function Dashboard() {
               <p className="text-slate-500 text-sm mt-1">{descricaoTela}</p>
             </div>
 
-            <Link href="/" className="text-blue-700 hover:text-blue-900 text-sm font-medium inline-flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMenuAberto((valorAtual) => !valorAtual)}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+              >
+                <Menu className="h-4 w-4" />
+                {menuAberto ? "Ocultar menu" : "Mostrar menu"}
+              </button>
+              <button
+                onClick={sair}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Sair
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 p-5 md:p-6">
@@ -354,11 +380,11 @@ export default function Dashboard() {
                     <thead>
                       <tr className="bg-gradient-to-r from-slate-100 to-slate-50 text-slate-700">
                         <th className="sticky top-0 z-10 w-[6%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">#</th>
-                        <th className="sticky top-0 z-10 w-[32%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Servidor</th>
-                        <th className="sticky top-0 z-10 w-[22%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Título</th>
+                        <th className="sticky top-0 z-10 w-[36%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Servidor</th>
+                        <th className="sticky top-0 z-10 w-[26%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Título</th>
                         <th className="sticky top-0 z-10 w-[10%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">MaSP</th>
-                        <th className="sticky top-0 z-10 w-[10%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Página</th>
-                        <th className="sticky top-0 z-10 w-[10%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Coluna</th>
+                        <th className="sticky top-0 z-10 w-[6%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Página</th>
+                        <th className="sticky top-0 z-10 w-[6%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Coluna</th>
                         <th className="sticky top-0 z-10 w-[10%] border-b border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider">Data</th>
                       </tr>
                     </thead>
