@@ -1,3 +1,5 @@
+import { PassThrough } from "stream"
+import archiver from "archiver"
 import { gerarDoc } from "@/lib/doc"
 
 export const runtime = "nodejs"
@@ -111,6 +113,51 @@ async function gerarDocsEmLotes(registros: ReturnType<typeof normalizarRegistro>
   return buffers
 }
 
+function agruparRegistrosPorTitulo(registros: ReturnType<typeof normalizarRegistro>[]) {
+  const grupos = new Map<string, { titulo: string; registros: ReturnType<typeof normalizarRegistro>[] }>()
+
+  for (const registro of registros) {
+    const titulo = registro.titulo || "Sem título"
+    const chave = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+    const grupoExistente = grupos.get(chave)
+
+    if (grupoExistente) {
+      grupoExistente.registros.push(registro)
+      continue
+    }
+
+    grupos.set(chave, { titulo, registros: [registro] })
+  }
+
+  return Array.from(grupos.values())
+}
+
+async function gerarZipComDocumentos(documentos: Array<{ nomeArquivo: string; buffer: Buffer }>) {
+  const stream = new PassThrough()
+  const archive = archiver("zip", { zlib: { level: 9 } })
+  const chunks: Buffer[] = []
+
+  return await new Promise<Buffer>((resolve, reject) => {
+    stream.on("data", (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    })
+
+    stream.on("end", () => {
+      resolve(Buffer.concat(chunks))
+    })
+
+    stream.on("error", reject)
+    archive.on("error", reject)
+    archive.pipe(stream)
+
+    for (const documento of documentos) {
+      archive.append(documento.buffer, { name: documento.nomeArquivo })
+    }
+
+    void archive.finalize()
+  })
+}
+
 export async function POST(req: Request) {
   const { registros }: { registros: Registro[] } = await req.json()
 
@@ -123,16 +170,42 @@ export async function POST(req: Request) {
   }
 
   const registrosNormalizados = registros.map((item: Registro) => normalizarRegistro(item))
-  const nomeArquivo = sanitizarNomeArquivo(registrosNormalizados[0]?.titulo)
+  const gruposPorTitulo = agruparRegistrosPorTitulo(registrosNormalizados)
 
-  const docs = await gerarDocsEmLotes(registrosNormalizados)
-  const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
-  const payload = new Uint8Array(buffer)
+  if (gruposPorTitulo.length === 1) {
+    const nomeArquivo = sanitizarNomeArquivo(gruposPorTitulo[0]?.titulo)
+    const docs = await gerarDocsEmLotes(gruposPorTitulo[0].registros)
+    const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
+    const payload = new Uint8Array(buffer)
+
+    return new Response(payload, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": montarContentDisposition(nomeArquivo)
+      }
+    })
+  }
+
+  const documentosPorTitulo: Array<{ nomeArquivo: string; buffer: Buffer }> = []
+
+  for (const grupo of gruposPorTitulo) {
+    const docs = await gerarDocsEmLotes(grupo.registros)
+    const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
+
+    documentosPorTitulo.push({
+      nomeArquivo: sanitizarNomeArquivo(grupo.titulo),
+      buffer,
+    })
+  }
+
+  const zipBuffer = await gerarZipComDocumentos(documentosPorTitulo)
+  const payload = new Uint8Array(zipBuffer)
+  const nomeZip = "documentos_por_titulo.zip"
 
   return new Response(payload, {
     headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "Content-Disposition": montarContentDisposition(nomeArquivo)
+      "Content-Type": "application/zip",
+      "Content-Disposition": montarContentDisposition(nomeZip)
     }
   })
 }

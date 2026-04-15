@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu } from "lucide-react"
+import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight } from "lucide-react"
 
 interface Registro {
   titulo: string
@@ -180,12 +180,14 @@ export default function Dashboard() {
       : activeTab === "edit"
         ? "Revise e refine os dados antes de gerar o documento final"
         : "Finalize e baixe o documento consolidado"
+  const totalTitulos = new Set(dados.map((registro) => (registro.titulo || "").trim() || "Sem título")).size
+  const exportacaoPorTitulo = totalTitulos > 1
 
   return (
     <div className="min-h-screen bg-slate-100 md:flex">
       <aside
         className={cn(
-          "w-full md:w-72 bg-gradient-to-b from-blue-900 via-blue-900 to-blue-950 text-white p-6 flex flex-col shadow-2xl",
+          "relative w-full md:w-72 bg-gradient-to-b from-blue-900 via-blue-900 to-blue-950 text-white p-6 flex flex-col shadow-2xl",
           !menuAberto && "hidden"
         )}
       >
@@ -205,6 +207,15 @@ export default function Dashboard() {
             <p className="text-xs opacity-80">SInfo v2.6</p>
           </div>
         </Link>
+
+        <button
+          onClick={() => setMenuAberto(false)}
+          className="absolute -right-3 top-6 hidden h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-white shadow-lg transition-colors hover:bg-slate-800 md:flex"
+          aria-label="Ocultar menu"
+          title="Ocultar menu"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
 
         <nav className="flex flex-col gap-2 text-sm">
           <button
@@ -261,19 +272,22 @@ export default function Dashboard() {
       <main className="flex-1 p-4 md:p-6 xl:p-8">
         <div className="mx-auto w-full max-w-[1700px]">
           <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
+            <div className={cn("transition-all duration-200", !menuAberto && "md:ml-14")}>
               <h2 className="text-2xl md:text-3xl font-bold text-slate-800">{tituloTela}</h2>
               <p className="text-slate-500 text-sm mt-1">{descricaoTela}</p>
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setMenuAberto((valorAtual) => !valorAtual)}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
-              >
-                <Menu className="h-4 w-4" />
-                {menuAberto ? "Ocultar menu" : "Mostrar menu"}
-              </button>
+              {!menuAberto && (
+                <button
+                  onClick={() => setMenuAberto(true)}
+                  className="fixed left-3 top-6 z-30 hidden h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-white shadow-lg transition-colors hover:bg-slate-800 md:inline-flex"
+                  aria-label="Mostrar menu"
+                  title="Mostrar menu"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
               <button
                 onClick={sair}
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
@@ -485,7 +499,9 @@ export default function Dashboard() {
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-3 text-center">Tudo Pronto!</h2>
                 <p className="text-slate-600 mb-10 text-center max-w-md leading-relaxed">
-                  Geramos um documento Word único com {dados.length} página{dados.length > 1 ? "s" : ""}, uma para cada servidor, seguindo o modelo fornecido.
+                  {exportacaoPorTitulo
+                    ? `Encontramos ${totalTitulos} títulos diferentes. O download será entregue em um arquivo ZIP com um documento para cada título.`
+                    : `Geramos um documento Word único com ${dados.length} página${dados.length > 1 ? "s" : ""}, uma para cada servidor, seguindo o modelo fornecido.`}
                 </p>
 
                 <button
@@ -494,7 +510,13 @@ export default function Dashboard() {
                   disabled={gerandoDocumento}
                 >
                   <Download size={20} />
-                  {gerandoDocumento ? "Gerando documento..." : "Baixar Documento (.DOCX)"}
+                  {gerandoDocumento
+                    ? exportacaoPorTitulo
+                      ? "Gerando documentos..."
+                      : "Gerando documento..."
+                    : exportacaoPorTitulo
+                      ? "Baixar documentos por título (.ZIP)"
+                      : "Baixar Documento (.DOCX)"}
                 </button>
 
                 {gerandoDocumento && (
@@ -510,7 +532,9 @@ export default function Dashboard() {
                       />
                     </div>
                     <p className="mt-2 text-center text-xs text-slate-500">
-                      Textos muito grandes podem levar mais tempo para mesclar todas as páginas do documento.
+                      {exportacaoPorTitulo
+                        ? "Textos muito grandes podem levar mais tempo para gerar e compactar todos os documentos por título."
+                        : "Textos muito grandes podem levar mais tempo para mesclar todas as páginas do documento."}
                     </p>
                   </div>
                 )}

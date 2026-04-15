@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Download, FileText, ClipboardList, LogOut, Menu } from "lucide-react"
+import { ArrowLeft, Download, FileText, ClipboardList, LogOut, Menu, ChevronRight } from "lucide-react"
 
 export default function Lauda() {
   const router = useRouter()
@@ -81,7 +81,7 @@ export default function Lauda() {
 
   return (
     <div className="min-h-screen bg-slate-100 md:flex">
-      <aside className={`${menuAberto ? "flex" : "hidden"} w-full md:w-72 bg-gradient-to-b from-blue-900 via-blue-900 to-blue-950 text-white p-6 flex-col shadow-2xl`}>
+      <aside className={`${menuAberto ? "flex" : "hidden"} relative w-full md:w-72 bg-gradient-to-b from-blue-900 via-blue-900 to-blue-950 text-white p-6 flex-col shadow-2xl`}>
         <Link href="/" className="flex items-center gap-3 mb-8 hover:opacity-90 transition-opacity">
           <div className="shrink-0 h-16 w-16 overflow-hidden rounded-full bg-white p-0.5 shadow-md">
             <Image
@@ -98,6 +98,15 @@ export default function Lauda() {
             <p className="text-xs opacity-80">SInfo v2.6</p>
           </div>
         </Link>
+
+        <button
+          onClick={() => setMenuAberto(false)}
+          className="absolute -right-3 top-6 hidden h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-white shadow-lg transition-colors hover:bg-slate-800 md:flex"
+          aria-label="Ocultar menu"
+          title="Ocultar menu"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
 
         <nav className="flex flex-col gap-2 text-sm">
           <Link
@@ -120,7 +129,7 @@ export default function Lauda() {
       <main className="flex-1 p-4 md:p-6 xl:p-8">
         <div className="mx-auto w-full max-w-[1700px]">
           <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
+            <div className={`transition-all duration-200 ${!menuAberto ? "md:ml-14" : ""}`}>
               <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Preparar Lauda para Envio</h2>
               <p className="text-slate-500 text-sm mt-1">
                 Cole o texto da lauda abaixo e gere o documento RTF formatado
@@ -128,13 +137,16 @@ export default function Lauda() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setMenuAberto((valorAtual) => !valorAtual)}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
-              >
-                <Menu className="h-4 w-4" />
-                {menuAberto ? "Ocultar menu" : "Mostrar menu"}
-              </button>
+              {!menuAberto && (
+                <button
+                  onClick={() => setMenuAberto(true)}
+                  className="fixed left-3 top-6 z-30 hidden h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-white shadow-lg transition-colors hover:bg-slate-800 md:inline-flex"
+                  aria-label="Mostrar menu"
+                  title="Mostrar menu"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
               <Link href="/dashboard" className="text-blue-700 hover:text-blue-900 text-sm font-medium inline-flex items-center gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Voltar ao painel
