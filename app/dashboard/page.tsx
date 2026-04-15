@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -120,6 +120,14 @@ export default function Dashboard() {
     if (!elemento) return
     elemento.style.height = "auto"
     elemento.style.height = `${elemento.scrollHeight}px`
+  }
+
+  function normalizarTituloParaAgrupamento(titulo: string) {
+    return (titulo || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase()
   }
 
   async function sair() {
@@ -403,85 +411,114 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {dados.map((d, i) => (
-                        <tr key={i} className="odd:bg-white even:bg-slate-50/50 border-b border-slate-100 hover:bg-blue-50/30 transition-colors">
-                          <td className="px-3 py-2 align-top font-medium text-slate-600">{i + 1}</td>
-                          <td className="p-2 align-top">
-                            <textarea
-                              data-row={i}
-                              data-col={0}
-                              rows={1}
-                              className="w-full min-h-[84px] overflow-hidden resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 leading-6 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
-                              placeholder="Nome do servidor"
-                              value={d.servidor}
-                              onChange={(e) => atualizarRegistro(i, "servidor", e.target.value)}
-                              onInput={(e) => ajustarAlturaServidor(e.currentTarget)}
-                              ref={ajustarAlturaServidor}
-                              onKeyDown={(e) => onKeyDownPlanilha(e, i, 0)}
-                            />
-                          </td>
-                          <td className="p-2 align-top">
-                            <input
-                              data-row={i}
-                              data-col={1}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
-                              placeholder="Título do registro"
-                              value={d.titulo}
-                              onChange={(e) => atualizarRegistro(i, "titulo", e.target.value)}
-                              onKeyDown={(e) => onKeyDownPlanilha(e, i, 1)}
-                            />
-                          </td>
-                          <td className="p-2 align-top">
-                            <input
-                              data-row={i}
-                              data-col={2}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
-                              placeholder="Ex: 1.234.567-8"
-                              value={d.masp}
-                              onChange={(e) => atualizarRegistro(i, "masp", e.target.value)}
-                              onKeyDown={(e) => onKeyDownPlanilha(e, i, 2)}
-                            />
-                          </td>
-                          <td className="p-2 align-top">
-                            <input
-                              data-row={i}
-                              data-col={3}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
-                              placeholder="Ex: 42"
-                              value={d.pagina}
-                              onChange={(e) => atualizarRegistro(i, "pagina", e.target.value)}
-                              onKeyDown={(e) => onKeyDownPlanilha(e, i, 3)}
-                            />
-                          </td>
-                          <td className="p-2 align-top">
-                            <input
-                              data-row={i}
-                              data-col={4}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
-                              placeholder="Ex: 1"
-                              value={d.coluna}
-                              onChange={(e) => atualizarRegistro(i, "coluna", e.target.value)}
-                              onKeyDown={(e) => onKeyDownPlanilha(e, i, 4)}
-                            />
-                          </td>
-                          <td className="p-2 align-top">
-                            <input
-                              data-row={i}
-                              data-col={5}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
-                              placeholder="Ex: 20/03/24"
-                              value={d.data}
-                              onChange={(e) => atualizarRegistro(i, "data", e.target.value)}
-                              onKeyDown={(e) => onKeyDownPlanilha(e, i, 5)}
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                      {dados.map((d, i) => {
+                        const tituloAnterior = i > 0 ? dados[i - 1]?.titulo || "" : ""
+                        const novoTitulo = i === 0 || normalizarTituloParaAgrupamento(d.titulo) !== normalizarTituloParaAgrupamento(tituloAnterior)
+
+                        return (
+                          <Fragment key={`${i}-${d.titulo}-${d.servidor}`}>
+                            {novoTitulo && (
+                              <tr className="bg-amber-50">
+                                <td colSpan={7} className="border-y-2 border-amber-300 px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                                      {i === 0 ? "Primeiro título" : "Novo título"}
+                                    </span>
+                                    <span className="text-sm font-semibold text-slate-800">{d.titulo || "Sem título informado"}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+
+                            <tr key={i} className={cn("border-b border-slate-100 hover:bg-blue-50/30 transition-colors", i % 2 === 0 ? "bg-white" : "bg-slate-50/50")}>
+                              <td className="px-3 py-2 align-top font-medium text-slate-600">{i + 1}</td>
+                              <td className="p-2 align-top">
+                                <textarea
+                                  data-row={i}
+                                  data-col={0}
+                                  rows={1}
+                                  className="w-full min-h-[84px] overflow-hidden resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 leading-6 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
+                                  placeholder="Nome do servidor"
+                                  value={d.servidor}
+                                  onChange={(e) => atualizarRegistro(i, "servidor", e.target.value)}
+                                  onInput={(e) => ajustarAlturaServidor(e.currentTarget)}
+                                  ref={ajustarAlturaServidor}
+                                  onKeyDown={(e) => onKeyDownPlanilha(e, i, 0)}
+                                />
+                              </td>
+                              <td className="p-2 align-top">
+                                <input
+                                  data-row={i}
+                                  data-col={1}
+                                  className={cn(
+                                    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400",
+                                    novoTitulo && "border-amber-300 bg-amber-50 ring-2 ring-amber-100"
+                                  )}
+                                  placeholder="Título do registro"
+                                  value={d.titulo}
+                                  onChange={(e) => atualizarRegistro(i, "titulo", e.target.value)}
+                                  onKeyDown={(e) => onKeyDownPlanilha(e, i, 1)}
+                                />
+                              </td>
+                              <td className="p-2 align-top">
+                                <input
+                                  data-row={i}
+                                  data-col={2}
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
+                                  placeholder="Ex: 1.234.567-8"
+                                  value={d.masp}
+                                  onChange={(e) => atualizarRegistro(i, "masp", e.target.value)}
+                                  onKeyDown={(e) => onKeyDownPlanilha(e, i, 2)}
+                                />
+                              </td>
+                              <td className="p-2 align-top">
+                                <input
+                                  data-row={i}
+                                  data-col={3}
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
+                                  placeholder="Ex: 42"
+                                  value={d.pagina}
+                                  onChange={(e) => atualizarRegistro(i, "pagina", e.target.value)}
+                                  onKeyDown={(e) => onKeyDownPlanilha(e, i, 3)}
+                                />
+                              </td>
+                              <td className="p-2 align-top">
+                                <input
+                                  data-row={i}
+                                  data-col={4}
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
+                                  placeholder="Ex: 1"
+                                  value={d.coluna}
+                                  onChange={(e) => atualizarRegistro(i, "coluna", e.target.value)}
+                                  onKeyDown={(e) => onKeyDownPlanilha(e, i, 4)}
+                                />
+                              </td>
+                              <td className="p-2 align-top">
+                                <input
+                                  data-row={i}
+                                  data-col={5}
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200 placeholder:text-slate-400"
+                                  placeholder="Ex: 20/03/24"
+                                  value={d.data}
+                                  onChange={(e) => atualizarRegistro(i, "data", e.target.value)}
+                                  onKeyDown={(e) => onKeyDownPlanilha(e, i, 5)}
+                                />
+                              </td>
+                            </tr>
+                          </Fragment>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2.5 px-6 rounded-xl shadow-sm transition-all duration-300"
+                    onClick={() => setActiveTab("input")}
+                  >
+                    Voltar
+                  </button>
                   <button
                     className="bg-blue-900 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl shadow-sm transition-all duration-300"
                     onClick={() => setActiveTab("export")}
@@ -541,16 +578,14 @@ export default function Dashboard() {
 
                 <button
                   onClick={() => setActiveTab("edit")}
-                  className="text-slate-600 hover:text-slate-900 font-medium transition-colors"
+                  className="mt-2 rounded-xl bg-slate-600 px-6 py-2.5 font-semibold text-white shadow-sm transition-all duration-300 hover:bg-slate-700"
                 >
-                  Fazer correções nos dados
+                  Voltar e corrigir
                 </button>
               </div>
             )}
 
-            <div className="mt-8 pt-6 border-t border-slate-200 text-sm text-slate-500">
-              Sistema de Informativos (SInfo) - Plataforma institucional
-            </div>
+
           </div>
         </div>
       </main>

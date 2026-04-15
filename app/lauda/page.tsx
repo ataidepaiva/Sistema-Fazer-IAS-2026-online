@@ -147,9 +147,12 @@ export default function Lauda() {
                   <ChevronRight className="h-4 w-4" />
                 </button>
               )}
-              <Link href="/dashboard" className="text-blue-700 hover:text-blue-900 text-sm font-medium inline-flex items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-800"
+              >
                 <ArrowLeft className="h-4 w-4" />
-                Voltar ao painel
+                Fazer IAS
               </Link>
               <button
                 onClick={sair}
