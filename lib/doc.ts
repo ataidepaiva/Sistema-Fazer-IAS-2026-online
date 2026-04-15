@@ -6,6 +6,15 @@ import Docxtemplater from "docxtemplater"
 
 const cacheModelos = new Map<string, string>()
 
+export function limparCacheModelo(modeloPath?: string) {
+  if (modeloPath) {
+    cacheModelos.delete(modeloPath)
+    return
+  }
+
+  cacheModelos.clear()
+}
+
 function lerModelo(modeloPath: string) {
   const modeloEmCache = cacheModelos.get(modeloPath)
 

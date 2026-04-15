@@ -11,5 +11,13 @@ export async function POST() {
     expires: new Date(0),
   })
 
+  response.cookies.set("sinfo-role", "", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(0),
+  })
+
   return response
 }

@@ -1,11 +1,11 @@
 "use client"
 
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { Fragment, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight } from "lucide-react"
+import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight, Upload } from "lucide-react"
 
 interface Registro {
   titulo: string
@@ -30,7 +30,19 @@ export default function Dashboard() {
   const [gerandoDocumento, setGerandoDocumento] = useState(false)
   const [progressoGeracao, setProgressoGeracao] = useState(0)
   const [tempoDecorridoSegundos, setTempoDecorridoSegundos] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [mensagemModelo, setMensagemModelo] = useState("")
   const inicioGeracaoRef = useRef<number | null>(null)
+  const inputModeloRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    const perfil = document.cookie
+      .split("; ")
+      .find((item) => item.startsWith("sinfo-role="))
+      ?.split("=")[1]
+
+    setIsAdmin(perfil === "admin")
+  }, [])
 
   useEffect(() => {
     if (!gerandoDocumento) return
@@ -128,6 +140,40 @@ export default function Dashboard() {
       .replace(/[\u0300-\u036f]/g, "")
       .trim()
       .toUpperCase()
+  }
+
+  function baixarModelo() {
+    window.location.href = "/api/modelo"
+  }
+
+  async function subirNovoModelo(event: ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0]
+
+    if (!arquivo) return
+
+    const formData = new FormData()
+    formData.append("arquivo", arquivo)
+    setMensagemModelo("Enviando novo modelo...")
+
+    try {
+      const resposta = await fetch("/api/modelo", {
+        method: "POST",
+        body: formData,
+      })
+
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemModelo(json?.error || "Falha ao atualizar o modelo")
+        return
+      }
+
+      setMensagemModelo(`Modelo atualizado com sucesso: ${json?.arquivo || arquivo.name}`)
+    } catch {
+      setMensagemModelo("Falha ao enviar o novo modelo")
+    } finally {
+      event.target.value = ""
+    }
   }
 
   async function sair() {
@@ -274,7 +320,35 @@ export default function Dashboard() {
           </Link>
         </nav>
 
-        <div className="mt-auto pt-8 text-xs opacity-70">© {new Date().getFullYear()} SRE Varginha</div>
+        <div className="mt-auto pt-6">
+          {isAdmin && (
+            <div className="space-y-2 border-t border-blue-800/70 pt-4">
+              <button
+                type="button"
+                onClick={baixarModelo}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+              >
+                <Download className="h-4 w-4" />
+                Baixar modelo de IA
+              </button>
+
+              <button
+                type="button"
+                onClick={() => inputModeloRef.current?.click()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-500"
+              >
+                <Upload className="h-4 w-4" />
+                Subir novo modelo
+              </button>
+
+              <input ref={inputModeloRef} type="file" accept=".docx" className="hidden" onChange={subirNovoModelo} />
+
+              {mensagemModelo ? <p className="text-xs text-blue-100/90">{mensagemModelo}</p> : null}
+            </div>
+          )}
+
+          <div className="pt-6 text-xs opacity-70">© {new Date().getFullYear()} SRE Varginha</div>
+        </div>
       </aside>
 
       <main className="flex-1 p-4 md:p-6 xl:p-8">

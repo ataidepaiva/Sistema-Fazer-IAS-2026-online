@@ -3,7 +3,8 @@ import { NextResponse } from "next/server"
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const autenticado = request.cookies.get("sinfo-auth")?.value === "ok"
+  const perfil = request.cookies.get("sinfo-auth")?.value
+  const autenticado = perfil === "user" || perfil === "admin"
 
   const rotasProtegidas = ["/dashboard", "/lauda"]
   const rotaProtegida = rotasProtegidas.some((rota) => pathname.startsWith(rota))
