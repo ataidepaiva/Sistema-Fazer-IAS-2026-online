@@ -103,7 +103,7 @@ async function gerarDocsEmLotes(registros: ReturnType<typeof normalizarRegistro>
   const buffers: Buffer[] = []
 
   for (let index = 0; index < registros.length; index += 1) {
-    buffers.push(gerarDoc("modelo.docx", registros[index]))
+    buffers.push(await gerarDoc("modelo.docx", registros[index]))
 
     if ((index + 1) % 25 === 0) {
       await new Promise<void>((resolve) => setImmediate(resolve))

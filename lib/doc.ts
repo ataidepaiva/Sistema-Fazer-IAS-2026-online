@@ -1,10 +1,10 @@
 import "server-only"
 
-import fs from "fs"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
+import { lerModeloArquivo } from "@/lib/model-storage"
 
-const cacheModelos = new Map<string, string>()
+const cacheModelos = new Map<string, Buffer>()
 
 export function limparCacheModelo(modeloPath?: string) {
   if (modeloPath) {
@@ -15,22 +15,22 @@ export function limparCacheModelo(modeloPath?: string) {
   cacheModelos.clear()
 }
 
-function lerModelo(modeloPath: string) {
+async function lerModelo(modeloPath: string) {
   const modeloEmCache = cacheModelos.get(modeloPath)
 
   if (modeloEmCache) {
     return modeloEmCache
   }
 
-  const content = fs.readFileSync(modeloPath, "binary")
+  const content = await lerModeloArquivo(modeloPath)
   cacheModelos.set(modeloPath, content)
   return content
 }
 
-export function gerarDoc(modeloPath: string, dados: object) {
-  const content = lerModelo(modeloPath)
+export async function gerarDoc(modeloPath: string, dados: object) {
+  const content = await lerModelo(modeloPath)
 
-  const zip = new PizZip(content)
+  const zip = new PizZip(content.toString("binary"))
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })
 
   doc.render(dados)

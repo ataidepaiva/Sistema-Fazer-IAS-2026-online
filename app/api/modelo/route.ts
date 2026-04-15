@@ -1,11 +1,8 @@
-import { promises as fs } from "fs"
-import path from "path"
 import { NextResponse } from "next/server"
 import { limparCacheModelo } from "@/lib/doc"
+import { lerModeloArquivo, salvarModeloArquivo } from "@/lib/model-storage"
 
 export const runtime = "nodejs"
-
-const caminhoModelo = path.join(process.cwd(), "modelo.docx")
 
 function usuarioEhAdmin(request: Request) {
   const cookies = request.headers.get("cookie") || ""
@@ -20,7 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
   }
 
-  const arquivo = await fs.readFile(caminhoModelo)
+  const arquivo = await lerModeloArquivo("modelo.docx")
 
   return new Response(new Uint8Array(arquivo), {
     headers: {
@@ -52,8 +49,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 })
   }
 
-  await fs.writeFile(caminhoModelo, buffer)
-  limparCacheModelo(caminhoModelo)
+  try {
+    await salvarModeloArquivo(buffer, "modelo.docx")
+    limparCacheModelo("modelo.docx")
 
-  return NextResponse.json({ ok: true, arquivo: arquivo.name })
+    return NextResponse.json({ ok: true, arquivo: arquivo.name })
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : "Falha ao atualizar o modelo"
+    return NextResponse.json({ error: mensagem }, { status: 500 })
+  }
 }
