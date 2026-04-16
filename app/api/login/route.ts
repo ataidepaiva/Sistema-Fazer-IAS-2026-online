@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 
+const USUARIO_COMUM = process.env.USER_USERNAME?.trim()
+const SENHA_COMUM = process.env.USER_PASSWORD?.trim()
 const USUARIO_ADMIN = process.env.ADMIN_USERNAME?.trim() || "admin"
 const SENHA_ADMIN = process.env.ADMIN_PASSWORD?.trim()
 
 function obterPerfil(usuario: string, senha: string) {
-  if (usuario === "seemg" && senha === "seemg") return "user"
+  if (USUARIO_COMUM && SENHA_COMUM && usuario === USUARIO_COMUM && senha === SENHA_COMUM) return "user"
   if (SENHA_ADMIN && usuario === USUARIO_ADMIN && senha === SENHA_ADMIN) return "admin"
   return null
 }
