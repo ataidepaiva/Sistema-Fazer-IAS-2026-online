@@ -52,8 +52,9 @@ export default function SREVarginha() {
       </main>
 
       <footer className={styles.footer}>
-        <p>© {new Date().getFullYear()} Superintendência Regional de Ensino de Varginha</p>
+        <p>Superintendência Regional de Ensino de Varginha</p>
         <p>Sistema desenvolvido para otimização na produção de IAS</p>
+        <p>© {new Date().getFullYear()} Desenvolvido por Ataide de Paula Paiva - Todos os Direitos Reservados</p>
       </footer>
     </div>
   )

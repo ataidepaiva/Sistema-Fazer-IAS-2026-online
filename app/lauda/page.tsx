@@ -196,7 +196,8 @@ export default function Lauda() {
             </div>
           )}
 
-          <div className="pt-6 text-xs opacity-70">© {new Date().getFullYear()} SRE Varginha</div>
+          <div className="pt-6 text-xs opacity-70">SRE Varginha</div>
+          <div className="pt-1 text-xs opacity-70">© {new Date().getFullYear()} Desenvolvido por Ataide de Paula Paiva - Todos os Direitos Reservados</div>
         </div>
       </aside>
 

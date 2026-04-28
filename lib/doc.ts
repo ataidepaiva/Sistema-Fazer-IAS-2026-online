@@ -2,7 +2,7 @@ import "server-only"
 
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
-import { lerModeloArquivo } from "@/lib/model-storage"
+import { lerModeloArquivo, lerModeloAtivoArquivo } from "@/lib/model-storage"
 
 const cacheModelos = new Map<string, Buffer>()
 
@@ -22,7 +22,10 @@ async function lerModelo(modeloPath: string) {
     return modeloEmCache
   }
 
-  const content = await lerModeloArquivo(modeloPath)
+  const content = modeloPath === "modelo.docx"
+    ? (await lerModeloAtivoArquivo()).conteudo
+    : await lerModeloArquivo(modeloPath)
+
   cacheModelos.set(modeloPath, content)
   return content
 }

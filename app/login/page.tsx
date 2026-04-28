@@ -119,8 +119,9 @@ export default function LoginPage() {
       </main>
 
       <footer className={styles.footer}>
-        <p>© {anoAtual} Superintendência Regional de Ensino de Varginha</p>
+        <p>Superintendência Regional de Ensino de Varginha</p>
         <p>Sistema desenvolvido para otimização na produção de IAS</p>
+        <p>© {anoAtual} Desenvolvido por Ataide de Paula Paiva - Todos os Direitos Reservados</p>
       </footer>
     </div>
   )

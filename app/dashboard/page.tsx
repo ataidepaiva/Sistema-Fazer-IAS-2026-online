@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight, Upload } from "lucide-react"
+import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight, Upload, Trash2 } from "lucide-react"
 
 interface Registro {
   titulo: string
@@ -176,6 +176,33 @@ export default function Dashboard() {
     }
   }
 
+  async function excluirModeloPersonalizado() {
+    const confirmar = window.confirm("Deseja excluir o modelo personalizado e voltar para o modelo padrão?")
+
+    if (!confirmar) {
+      return
+    }
+
+    setMensagemModelo("Excluindo modelo personalizado...")
+
+    try {
+      const resposta = await fetch("/api/modelo", {
+        method: "DELETE",
+      })
+
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemModelo(json?.error || "Falha ao excluir o modelo personalizado")
+        return
+      }
+
+      setMensagemModelo(json?.mensagem || "Modelo padrão reativado com sucesso")
+    } catch {
+      setMensagemModelo("Falha ao excluir o modelo personalizado")
+    }
+  }
+
   async function sair() {
     await fetch("/api/logout", { method: "POST" })
     router.push("/login")
@@ -329,7 +356,7 @@ export default function Dashboard() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
               >
                 <Download className="h-4 w-4" />
-                Baixar modelo de IA
+                Baixar modelo em uso
               </button>
 
               <button
@@ -341,13 +368,23 @@ export default function Dashboard() {
                 Subir novo modelo
               </button>
 
+              <button
+                type="button"
+                onClick={excluirModeloPersonalizado}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir modelo personalizado
+              </button>
+
               <input ref={inputModeloRef} type="file" accept=".docx" className="hidden" onChange={subirNovoModelo} />
 
               {mensagemModelo ? <p className="text-xs text-blue-100/90">{mensagemModelo}</p> : null}
             </div>
           )}
 
-          <div className="pt-6 text-xs opacity-70">© {new Date().getFullYear()} SRE Varginha</div>
+          <div className="pt-6 text-xs opacity-70">SRE Varginha</div>
+          <div className="pt-1 text-xs opacity-70">© {new Date().getFullYear()} Desenvolvido por Ataide de Paula Paiva - Todos os Direitos Reservados</div>
         </div>
       </aside>
 
