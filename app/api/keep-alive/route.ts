@@ -17,11 +17,18 @@ function extrairToken(request: Request) {
 function validarAcesso(request: Request) {
   const segredoConfigurado = process.env.KEEP_ALIVE_SECRET || process.env.CRON_SECRET
 
+  const userAgent = request.headers.get("user-agent") || ""
+  const chamadoPorCronVercel = userAgent.toLowerCase().includes("vercel-cron")
+
   if (!segredoConfigurado) {
+    if (chamadoPorCronVercel) {
+      return { ok: true as const }
+    }
+
     return {
       ok: false,
       status: 500,
-      mensagem: "Configure KEEP_ALIVE_SECRET ou CRON_SECRET para proteger o keep-alive.",
+      mensagem: "Configure KEEP_ALIVE_SECRET ou CRON_SECRET para chamadas manuais do keep-alive.",
     }
   }
 

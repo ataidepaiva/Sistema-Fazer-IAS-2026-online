@@ -159,53 +159,59 @@ async function gerarZipComDocumentos(documentos: Array<{ nomeArquivo: string; bu
 }
 
 export async function POST(req: Request) {
-  const { registros }: { registros: Registro[] } = await req.json()
+  try {
+    const body = await req.json().catch(() => null)
+    const registros = body?.registros as Registro[] | undefined
 
-  if (!Array.isArray(registros) || registros.length === 0) {
-    return Response.json({ error: "Nenhum registro informado" }, { status: 400 })
-  }
+    if (!Array.isArray(registros) || registros.length === 0) {
+      return Response.json({ error: "Nenhum registro informado" }, { status: 400 })
+    }
 
-  if (registros.some((item) => !item || typeof item !== "object")) {
-    return Response.json({ error: "Formato de registros inválido" }, { status: 400 })
-  }
+    if (registros.some((item) => !item || typeof item !== "object")) {
+      return Response.json({ error: "Formato de registros inválido" }, { status: 400 })
+    }
 
-  const registrosNormalizados = registros.map((item: Registro) => normalizarRegistro(item))
-  const gruposPorTitulo = agruparRegistrosPorTitulo(registrosNormalizados)
+    const registrosNormalizados = registros.map((item: Registro) => normalizarRegistro(item))
+    const gruposPorTitulo = agruparRegistrosPorTitulo(registrosNormalizados)
 
-  if (gruposPorTitulo.length === 1) {
-    const nomeArquivo = sanitizarNomeArquivo(gruposPorTitulo[0]?.titulo)
-    const docs = await gerarDocsEmLotes(gruposPorTitulo[0].registros)
-    const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
-    const payload = new Uint8Array(buffer)
+    if (gruposPorTitulo.length === 1) {
+      const nomeArquivo = sanitizarNomeArquivo(gruposPorTitulo[0]?.titulo)
+      const docs = await gerarDocsEmLotes(gruposPorTitulo[0].registros)
+      const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
+      const payload = new Uint8Array(buffer)
+
+      return new Response(payload, {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "Content-Disposition": montarContentDisposition(nomeArquivo)
+        }
+      })
+    }
+
+    const documentosPorTitulo: Array<{ nomeArquivo: string; buffer: Buffer }> = []
+
+    for (const grupo of gruposPorTitulo) {
+      const docs = await gerarDocsEmLotes(grupo.registros)
+      const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
+
+      documentosPorTitulo.push({
+        nomeArquivo: sanitizarNomeArquivo(grupo.titulo),
+        buffer,
+      })
+    }
+
+    const zipBuffer = await gerarZipComDocumentos(documentosPorTitulo)
+    const payload = new Uint8Array(zipBuffer)
+    const nomeZip = "documentos_por_titulo.zip"
 
     return new Response(payload, {
       headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": montarContentDisposition(nomeArquivo)
+        "Content-Type": "application/zip",
+        "Content-Disposition": montarContentDisposition(nomeZip)
       }
     })
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : "Falha inesperada ao gerar documento"
+    return Response.json({ error: mensagem }, { status: 500 })
   }
-
-  const documentosPorTitulo: Array<{ nomeArquivo: string; buffer: Buffer }> = []
-
-  for (const grupo of gruposPorTitulo) {
-    const docs = await gerarDocsEmLotes(grupo.registros)
-    const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
-
-    documentosPorTitulo.push({
-      nomeArquivo: sanitizarNomeArquivo(grupo.titulo),
-      buffer,
-    })
-  }
-
-  const zipBuffer = await gerarZipComDocumentos(documentosPorTitulo)
-  const payload = new Uint8Array(zipBuffer)
-  const nomeZip = "documentos_por_titulo.zip"
-
-  return new Response(payload, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": montarContentDisposition(nomeZip)
-    }
-  })
 }
