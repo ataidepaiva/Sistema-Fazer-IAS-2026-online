@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
   }
 
-  const diagnostico = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const diagnostico: Record<string, any> = {
     timestamp: new Date().toISOString(),
     node_env: process.env.NODE_ENV,
     env_vars: {
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
 
     if (cliente) {
       try {
-        const result = await cliente.execute("SELECT 1")
+        await cliente.execute("SELECT 1")
         diagnostico.turso_connection = {
           status: "success",
           test_query_result: "Connected successfully",
