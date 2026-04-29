@@ -45,8 +45,35 @@ export default function Lauda() {
     return () => window.clearInterval(timer)
   }, [gerando])
 
-  function baixarModelo() {
-    window.location.href = "/api/modelo"
+  async function baixarModelo() {
+    setMensagemModelo("Baixando modelo...")
+
+    try {
+      const resposta = await fetch("/api/modelo")
+      const json = await resposta.clone().json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemModelo(json?.error || "Falha ao baixar o modelo")
+        return
+      }
+
+      const blob = await resposta.blob()
+      const disposition = resposta.headers.get("Content-Disposition") || ""
+      const matchUtf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const match = disposition.match(/filename="([^"]+)"/i)
+      const nomeArquivo = matchUtf8?.[1] ? decodeURIComponent(matchUtf8[1]) : match?.[1] || "modelo.docx"
+
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = nomeArquivo
+      a.click()
+      window.URL.revokeObjectURL(url)
+
+      setMensagemModelo(`Download concluído: ${nomeArquivo}`)
+    } catch {
+      setMensagemModelo("Falha ao baixar o modelo")
+    }
   }
 
   async function subirNovoModelo(event: ChangeEvent<HTMLInputElement>) {

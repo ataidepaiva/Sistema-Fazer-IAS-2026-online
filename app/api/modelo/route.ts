@@ -22,6 +22,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
   }
 
+  const { searchParams } = new URL(request.url)
+
+  if (searchParams.get("status") === "1") {
+    const status = await obterStatusModeloAtivo()
+    return NextResponse.json({ ok: true, modeloAtivo: status })
+  }
+
   const modelo = await lerModeloAtivoArquivo()
 
   return new Response(new Uint8Array(modelo.conteudo), {

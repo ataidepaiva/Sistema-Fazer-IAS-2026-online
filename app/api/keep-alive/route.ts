@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { criarClienteTurso } from "@/lib/turso"
 
 export const runtime = "nodejs"
 
@@ -45,22 +45,6 @@ function validarAcesso(request: Request) {
   return { ok: true as const }
 }
 
-function criarClienteSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const chave = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !chave) {
-    return null
-  }
-
-  return createClient(url, chave, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  })
-}
-
 export async function GET(request: Request) {
   const acesso = validarAcesso(request)
 
@@ -68,23 +52,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: acesso.mensagem }, { status: acesso.status })
   }
 
-  const cliente = criarClienteSupabase()
+  const cliente = criarClienteTurso()
 
   if (!cliente) {
     return NextResponse.json(
-      { ok: false, error: "Variáveis do Supabase não configuradas." },
+      { ok: false, error: "Variáveis do Turso não configuradas." },
       { status: 500 }
     )
   }
 
   const inicio = Date.now()
-  const { data, error } = await cliente.storage.listBuckets()
 
-  if (error) {
+  try {
+    await cliente.execute("SELECT 1")
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : "Falha no healthcheck do Turso"
     return NextResponse.json(
       {
         ok: false,
-        error: error.message,
+        error: mensagem,
         checkedAt: new Date().toISOString(),
       },
       { status: 500 }
@@ -95,6 +81,6 @@ export async function GET(request: Request) {
     ok: true,
     checkedAt: new Date().toISOString(),
     tookMs: Date.now() - inicio,
-    buckets: data?.map((bucket) => bucket.name) || [],
+    database: "turso",
   })
 }

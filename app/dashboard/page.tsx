@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [tempoDecorridoSegundos, setTempoDecorridoSegundos] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
   const [mensagemModelo, setMensagemModelo] = useState("")
+  const [nomeModeloAtivo, setNomeModeloAtivo] = useState("modelo.docx")
   const inicioGeracaoRef = useRef<number | null>(null)
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
 
@@ -41,8 +42,32 @@ export default function Dashboard() {
       .find((item) => item.startsWith("sinfo-role="))
       ?.split("=")[1]
 
-    setIsAdmin(perfil === "admin")
+    const admin = perfil === "admin"
+    setIsAdmin(admin)
+
+    if (admin) {
+      void carregarStatusModelo()
+    }
   }, [])
+
+  async function carregarStatusModelo() {
+    try {
+      const resposta = await fetch("/api/modelo?status=1")
+
+      if (!resposta.ok) {
+        return
+      }
+
+      const json = await resposta.json().catch(() => null)
+      const nomeArquivo = json?.modeloAtivo?.nomeArquivo
+
+      if (typeof nomeArquivo === "string" && nomeArquivo.trim()) {
+        setNomeModeloAtivo(nomeArquivo)
+      }
+    } catch {
+      // Mantem fallback local quando a consulta de status falha.
+    }
+  }
 
   useEffect(() => {
     if (!gerandoDocumento) return
@@ -142,8 +167,35 @@ export default function Dashboard() {
       .toUpperCase()
   }
 
-  function baixarModelo() {
-    window.location.href = "/api/modelo"
+  async function baixarModelo() {
+    setMensagemModelo("Baixando modelo...")
+
+    try {
+      const resposta = await fetch("/api/modelo")
+      const json = await resposta.clone().json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemModelo(json?.error || "Falha ao baixar o modelo")
+        return
+      }
+
+      const blob = await resposta.blob()
+      const disposition = resposta.headers.get("Content-Disposition") || ""
+      const matchUtf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const match = disposition.match(/filename="([^"]+)"/i)
+      const nomeArquivo = matchUtf8?.[1] ? decodeURIComponent(matchUtf8[1]) : match?.[1] || "modelo.docx"
+
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = nomeArquivo
+      a.click()
+      window.URL.revokeObjectURL(url)
+
+      setMensagemModelo(`Download concluído: ${nomeArquivo}`)
+    } catch {
+      setMensagemModelo("Falha ao baixar o modelo")
+    }
   }
 
   async function subirNovoModelo(event: ChangeEvent<HTMLInputElement>) {
@@ -169,6 +221,11 @@ export default function Dashboard() {
       }
 
       setMensagemModelo(`Modelo atualizado com sucesso: ${json?.arquivo || arquivo.name}`)
+      const nomeArquivo = json?.modeloAtivo?.nomeArquivo
+
+      if (typeof nomeArquivo === "string" && nomeArquivo.trim()) {
+        setNomeModeloAtivo(nomeArquivo)
+      }
     } catch {
       setMensagemModelo("Falha ao enviar o novo modelo")
     } finally {
@@ -198,6 +255,11 @@ export default function Dashboard() {
       }
 
       setMensagemModelo(json?.mensagem || "Modelo padrão reativado com sucesso")
+      const nomeArquivo = json?.modeloAtivo?.nomeArquivo
+
+      if (typeof nomeArquivo === "string" && nomeArquivo.trim()) {
+        setNomeModeloAtivo(nomeArquivo)
+      }
     } catch {
       setMensagemModelo("Falha ao excluir o modelo personalizado")
     }
@@ -436,7 +498,7 @@ export default function Dashboard() {
                 />
 
                 <div className="flex items-center justify-between mt-4">
-                  <span className="text-xs text-slate-500">Modelo utilizado: modelo.docx</span>
+                  <span className="text-xs text-slate-500">Modelo utilizado: {nomeModeloAtivo}</span>
                   <button
                     className="bg-blue-900 text-white px-6 py-2.5 rounded-xl hover:bg-blue-700 transition flex items-center gap-2"
                     onClick={processar}

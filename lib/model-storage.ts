@@ -2,49 +2,135 @@ import "server-only"
 
 import { promises as fs } from "fs"
 import path from "path"
-import { createClient } from "@supabase/supabase-js"
+import { criarClienteTurso } from "@/lib/turso"
 
 const NOME_MODELO_PADRAO = "modelo.docx"
 const NOME_MODELO_CUSTOM = "modelo_custom.docx"
+const ID_REGISTRO_MODELO_CUSTOM = 1
+const ID_REGISTRO_MODELO_PRINCIPAL = 1
 
 function obterCaminhoLocal(nomeArquivo = NOME_MODELO_PADRAO) {
   return path.join(process.cwd(), nomeArquivo)
 }
 
-function obterBucketModelos() {
-  return process.env.SUPABASE_MODELOS_BUCKET || "modelos"
-}
-
-function criarClienteAdminSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !serviceRoleKey) {
-    return null
-  }
-
-  return createClient(url, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  })
-}
-
-async function lerArquivoSupabase(nomeArquivo: string) {
-  const cliente = criarClienteAdminSupabase()
+async function garantirTabelaModelos() {
+  const cliente = criarClienteTurso()
 
   if (!cliente) {
     return null
   }
 
-  const { data, error } = await cliente.storage.from(obterBucketModelos()).download(nomeArquivo)
+  await cliente.execute(`
+    CREATE TABLE IF NOT EXISTS modelos (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      nome_arquivo TEXT NOT NULL,
+      conteudo BLOB NOT NULL,
+      atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
 
-  if (error || !data) {
+  return cliente
+}
+
+async function garantirTabelaModeloPrincipal() {
+  const cliente = criarClienteTurso()
+
+  if (!cliente) {
     return null
   }
 
-  return Buffer.from(await data.arrayBuffer())
+  await cliente.execute(`
+    CREATE TABLE IF NOT EXISTS modelos_principais (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      nome_arquivo TEXT NOT NULL,
+      conteudo BLOB NOT NULL,
+      criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  return cliente
+}
+
+async function lerModeloCustomTurso() {
+  const cliente = await garantirTabelaModelos()
+
+  if (!cliente) {
+    return null
+  }
+
+  const resultado = await cliente.execute({
+    sql: "SELECT nome_arquivo, conteudo FROM modelos WHERE id = ?",
+    args: [ID_REGISTRO_MODELO_CUSTOM],
+  })
+
+  const linha = resultado.rows[0]
+
+  if (!linha) {
+    return null
+  }
+
+  const nomeArquivo = String(linha.nome_arquivo || NOME_MODELO_CUSTOM)
+  const conteudo = converterConteudoParaBuffer(linha.conteudo)
+
+  if (!conteudo) {
+    return null
+  }
+
+  return {
+    nomeArquivo,
+    conteudo,
+  }
+}
+
+async function lerModeloPrincipalTurso() {
+  const cliente = await garantirTabelaModeloPrincipal()
+
+  if (!cliente) {
+    return null
+  }
+
+  const resultado = await cliente.execute({
+    sql: "SELECT nome_arquivo, conteudo FROM modelos_principais WHERE id = ?",
+    args: [ID_REGISTRO_MODELO_PRINCIPAL],
+  })
+
+  const linha = resultado.rows[0]
+
+  if (!linha) {
+    return null
+  }
+
+  const nomeArquivo = String(linha.nome_arquivo || NOME_MODELO_PADRAO)
+  const conteudo = converterConteudoParaBuffer(linha.conteudo)
+
+  if (!conteudo) {
+    return null
+  }
+
+  return {
+    nomeArquivo,
+    conteudo,
+  }
+}
+
+function converterConteudoParaBuffer(conteudo: unknown) {
+  if (!conteudo) {
+    return null
+  }
+
+  if (Buffer.isBuffer(conteudo)) {
+    return conteudo
+  }
+
+  if (conteudo instanceof Uint8Array) {
+    return Buffer.from(conteudo)
+  }
+
+  if (conteudo instanceof ArrayBuffer) {
+    return Buffer.from(new Uint8Array(conteudo))
+  }
+
+  return null
 }
 
 async function lerArquivoLocal(nomeArquivo: string) {
@@ -62,10 +148,16 @@ async function lerArquivoLocal(nomeArquivo: string) {
 }
 
 export async function lerModeloArquivo(nomeArquivo = NOME_MODELO_PADRAO) {
-  const doSupabase = await lerArquivoSupabase(nomeArquivo)
+  if (nomeArquivo === NOME_MODELO_PADRAO) {
+    try {
+      const principalTurso = await lerModeloPrincipalTurso()
 
-  if (doSupabase) {
-    return doSupabase
+      if (principalTurso) {
+        return principalTurso.conteudo
+      }
+    } catch {
+      // Se o Turso falhar, tenta fallback local abaixo.
+    }
   }
 
   const local = await lerArquivoLocal(nomeArquivo)
@@ -78,10 +170,16 @@ export async function lerModeloArquivo(nomeArquivo = NOME_MODELO_PADRAO) {
 }
 
 export async function lerModeloAtivoArquivo() {
-  const custom = await lerArquivoSupabase(NOME_MODELO_CUSTOM)
+  let customTurso = null
 
-  if (custom) {
-    return { conteudo: custom, nomeArquivo: NOME_MODELO_CUSTOM, origem: "custom" as const }
+  try {
+    customTurso = await lerModeloCustomTurso()
+  } catch {
+    customTurso = null
+  }
+
+  if (customTurso) {
+    return { conteudo: customTurso.conteudo, nomeArquivo: customTurso.nomeArquivo, origem: "custom" as const }
   }
 
   const customLocal = await lerArquivoLocal(NOME_MODELO_CUSTOM)
@@ -90,28 +188,79 @@ export async function lerModeloAtivoArquivo() {
     return { conteudo: customLocal, nomeArquivo: NOME_MODELO_CUSTOM, origem: "custom" as const }
   }
 
+  try {
+    const principalTurso = await lerModeloPrincipalTurso()
+
+    if (principalTurso) {
+      return { conteudo: principalTurso.conteudo, nomeArquivo: principalTurso.nomeArquivo, origem: "principal" as const }
+    }
+  } catch {
+    // Se o Turso falhar, tenta fallback local abaixo.
+  }
+
   const padrao = await lerModeloArquivo(NOME_MODELO_PADRAO)
   return { conteudo: padrao, nomeArquivo: NOME_MODELO_PADRAO, origem: "padrao" as const }
 }
 
-export async function salvarModeloCustomizado(buffer: Buffer) {
-  const cliente = criarClienteAdminSupabase()
+export async function salvarModeloPrincipalImutavel(buffer: Buffer, nomeArquivo = NOME_MODELO_PADRAO) {
+  const cliente = await garantirTabelaModeloPrincipal()
 
-  if (cliente) {
-    const { error } = await cliente.storage.from(obterBucketModelos()).upload(NOME_MODELO_CUSTOM, buffer, {
-      upsert: true,
-      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    })
+  if (!cliente) {
+    throw new Error("Configure TURSO_DATABASE_URL e TURSO_AUTH_TOKEN para salvar o modelo principal imutável")
+  }
 
-    if (error) {
-      throw error
+  const resultado = await cliente.execute({
+    sql: `
+      INSERT INTO modelos_principais (id, nome_arquivo, conteudo)
+      VALUES (?, ?, ?)
+      ON CONFLICT(id) DO NOTHING
+    `,
+    args: [ID_REGISTRO_MODELO_PRINCIPAL, nomeArquivo, buffer],
+  })
+
+  return {
+    criado: (resultado.rowsAffected || 0) > 0,
+  }
+}
+
+export async function obterStatusModeloPrincipal() {
+  try {
+    const principal = await lerModeloPrincipalTurso()
+
+    if (!principal) {
+      return { existe: false as const }
     }
 
-    return { destino: "supabase" }
+    return {
+      existe: true as const,
+      nomeArquivo: principal.nomeArquivo,
+    }
+  } catch {
+    return { existe: false as const }
+  }
+}
+
+export async function salvarModeloCustomizado(buffer: Buffer) {
+  const cliente = await garantirTabelaModelos()
+
+  if (cliente) {
+    await cliente.execute({
+      sql: `
+        INSERT INTO modelos (id, nome_arquivo, conteudo, atualizado_em)
+        VALUES (?, ?, ?, datetime('now'))
+        ON CONFLICT(id) DO UPDATE SET
+          nome_arquivo = excluded.nome_arquivo,
+          conteudo = excluded.conteudo,
+          atualizado_em = datetime('now')
+      `,
+      args: [ID_REGISTRO_MODELO_CUSTOM, NOME_MODELO_CUSTOM, buffer],
+    })
+
+    return { destino: "turso" }
   }
 
   if (process.env.VERCEL) {
-    throw new Error("Configure SUPABASE_SERVICE_ROLE_KEY e SUPABASE_MODELOS_BUCKET para permitir upload do modelo na Vercel")
+    throw new Error("Configure TURSO_DATABASE_URL e TURSO_AUTH_TOKEN para permitir upload do modelo na Vercel")
   }
 
   await fs.writeFile(obterCaminhoLocal(NOME_MODELO_CUSTOM), buffer)
@@ -119,17 +268,15 @@ export async function salvarModeloCustomizado(buffer: Buffer) {
 }
 
 export async function excluirModeloCustomizado() {
-  const cliente = criarClienteAdminSupabase()
+  const cliente = await garantirTabelaModelos()
 
   if (cliente) {
-    const { data, error } = await cliente.storage.from(obterBucketModelos()).remove([NOME_MODELO_CUSTOM])
+    const resultado = await cliente.execute({
+      sql: "DELETE FROM modelos WHERE id = ?",
+      args: [ID_REGISTRO_MODELO_CUSTOM],
+    })
 
-    if (error) {
-      throw error
-    }
-
-    const removido = Array.isArray(data) ? data.some((item) => item.name === NOME_MODELO_CUSTOM) : false
-    return { destino: "supabase" as const, removido }
+    return { destino: "turso" as const, removido: (resultado.rowsAffected || 0) > 0 }
   }
 
   try {
