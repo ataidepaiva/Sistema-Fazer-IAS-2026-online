@@ -2,7 +2,7 @@ import "server-only"
 
 import { promises as fs } from "fs"
 import path from "path"
-import { criarClienteTurso } from "@/lib/turso"
+import { criarClienteTurso, criarClienteTursoObrigatorio } from "@/lib/turso"
 
 const NOME_MODELO_PADRAO = "modelo.docx"
 const NOME_MODELO_CUSTOM = "modelo_custom.docx"
@@ -32,12 +32,42 @@ async function garantirTabelaModelos() {
   return cliente
 }
 
+async function garantirTabelaModelosObrigatoria() {
+  const cliente = criarClienteTursoObrigatorio()
+
+  await cliente.execute(`
+    CREATE TABLE IF NOT EXISTS modelos (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      nome_arquivo TEXT NOT NULL,
+      conteudo BLOB NOT NULL,
+      atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  return cliente
+}
+
 async function garantirTabelaModeloPrincipal() {
   const cliente = criarClienteTurso()
 
   if (!cliente) {
     return null
   }
+
+  await cliente.execute(`
+    CREATE TABLE IF NOT EXISTS modelos_principais (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      nome_arquivo TEXT NOT NULL,
+      conteudo BLOB NOT NULL,
+      criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  return cliente
+}
+
+async function garantirTabelaModeloPrincipalObrigatoria() {
+  const cliente = criarClienteTursoObrigatorio()
 
   await cliente.execute(`
     CREATE TABLE IF NOT EXISTS modelos_principais (
@@ -203,7 +233,7 @@ export async function lerModeloAtivoArquivo() {
 }
 
 export async function salvarModeloPrincipalImutavel(buffer: Buffer, nomeArquivo = NOME_MODELO_PADRAO) {
-  const cliente = await garantirTabelaModeloPrincipal()
+  const cliente = process.env.VERCEL ? await garantirTabelaModeloPrincipalObrigatoria() : await garantirTabelaModeloPrincipal()
 
   if (!cliente) {
     throw new Error("Configure TURSO_DATABASE_URL e TURSO_AUTH_TOKEN para salvar o modelo principal imutável")
@@ -241,7 +271,7 @@ export async function obterStatusModeloPrincipal() {
 }
 
 export async function salvarModeloCustomizado(buffer: Buffer) {
-  const cliente = await garantirTabelaModelos()
+  const cliente = process.env.VERCEL ? await garantirTabelaModelosObrigatoria() : await garantirTabelaModelos()
 
   if (cliente) {
     await cliente.execute({
@@ -268,7 +298,7 @@ export async function salvarModeloCustomizado(buffer: Buffer) {
 }
 
 export async function excluirModeloCustomizado() {
-  const cliente = await garantirTabelaModelos()
+  const cliente = process.env.VERCEL ? await garantirTabelaModelosObrigatoria() : await garantirTabelaModelos()
 
   if (cliente) {
     const resultado = await cliente.execute({
