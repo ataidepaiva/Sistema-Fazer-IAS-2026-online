@@ -79,6 +79,8 @@ function dividirTextoPorTitulos(texto: string) {
   let blocoAtual: string[] = []
   let linhaAnteriorVazia = false
 
+  console.log(`[PARSE] Total de linhas: ${linhas.length}`)
+
   for (let i = 0; i < linhas.length; i++) {
     const linhaOriginal = linhas[i]
     const linha = linhaOriginal.trimEnd()
@@ -91,15 +93,25 @@ function dividirTextoPorTitulos(texto: string) {
       continue
     }
 
+    const ehTitulo = ehLinhaTitulo(linha)
+    if (ehTitulo && linhaAnteriorVazia) {
+      console.log(`[TÍTULO] Linha ${i}: "${linha.substring(0, 50)}..."`)
+    }
+
     // Se a linha anterior era vazia (parágrafo) e esta linha parece um título, inicia novo bloco
     // Validação: linha anterior deve terminar com ponto final (com ou sem espaços)
-    if (linhaAnteriorVazia && ehLinhaTitulo(linha) && blocoAtual.length > 0) {
+    if (linhaAnteriorVazia && ehTitulo && blocoAtual.length > 0) {
       // Verifica se a última linha não-vazia do bloco anterior termina com ponto
       const ultimaLinhaBloco = blocoAtual.filter((l) => l.trim()).slice(-1)[0]
-      if (ultimaLinhaBloco && /\.$/.test(ultimaLinhaBloco.trim())) {
+      const temPonto = ultimaLinhaBloco && /\.$/.test(ultimaLinhaBloco.trim())
+      
+      console.log(`[DIVISÃO] Última linha do bloco: "${ultimaLinhaBloco?.substring(0, 30)}..." | Tem ponto: ${temPonto}`)
+      
+      if (temPonto) {
         const blocoAnterior = blocoAtual.join("\n").trim()
 
         if (blocoAnterior) {
+          console.log(`[PUSH] Bloco ${blocos.length + 1} com título: "${blocoAnterior.split("\n")[0]}"`)
           blocos.push(blocoAnterior)
         }
 
@@ -116,9 +128,11 @@ function dividirTextoPorTitulos(texto: string) {
   const ultimoBloco = blocoAtual.join("\n").trim()
 
   if (ultimoBloco) {
+    console.log(`[PUSH] Último bloco com título: "${ultimoBloco.split("\n")[0]}"`)
     blocos.push(ultimoBloco)
   }
 
+  console.log(`[FINAL] Total de blocos: ${blocos.length}`)
   return blocos
 }
 
