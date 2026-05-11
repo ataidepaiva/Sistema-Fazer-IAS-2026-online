@@ -1,15 +1,14 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-const HOST_ORIGEM_REDIRECT = "sistema-fazer-ias-2026-online.vercel.app"
-const HOST_DESTINO_REDIRECT = "sistema-fazer-ias-2026-online-six.vercel.app"
+const HOST_CANONICO = "sistema-fazer-ias-2026-online-six.vercel.app"
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
-  const host = request.headers.get("host")
+  const host = request.headers.get("host")?.toLowerCase()
 
-  if (host === HOST_ORIGEM_REDIRECT) {
-    const url = new URL(`${request.nextUrl.pathname}${search}`, `https://${HOST_DESTINO_REDIRECT}`)
+  if (process.env.NODE_ENV === "production" && host && host !== HOST_CANONICO) {
+    const url = new URL(`${request.nextUrl.pathname}${search}`, `https://${HOST_CANONICO}`)
     return NextResponse.redirect(url, 308)
   }
 
