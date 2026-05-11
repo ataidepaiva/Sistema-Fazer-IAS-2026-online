@@ -40,6 +40,13 @@ function ehLinhaTitulo(linha: string): boolean {
     return true
   }
 
+  // Debug: log das primeiras linhas que parecem títulos
+  if (valor.length > 30 && /ATO/.test(valor)) {
+    console.log(
+      `[TÍTULO] "${valor.substring(0, 60)}..." => chars: ${[...valor].slice(32, 55).map((c) => `${c}(${c.charCodeAt(0)})`).join(",")}`
+    )
+  }
+
   // Padrão específico: MAIÚSCULAS – ATO Nº XX-XX
   // Exemplos: "DESIGNAÇÃO DE LOCAL DE EXERCÍCIO – ATO Nº 07-25"
   //           "AFASTAMENTO PRELIMINAR À APOSENTADORIA – ATO Nº 21 -25"
