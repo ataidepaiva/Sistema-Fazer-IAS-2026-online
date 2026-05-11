@@ -18,6 +18,14 @@ function normalizarTitulo(titulo: string): string {
     .toUpperCase()
 }
 
+function normalizarEntradaTexto(texto: string): string {
+  return texto
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u2028\u2029\u0085]/g, "\n")
+    .replace(/[\u00A0\u2007\u202F]/g, " ")
+    .replace(/\uFEFF/g, "")
+}
+
 function ehAtoEspecial(titulo: string): boolean {
   const tituloNormalizado = normalizarTitulo(titulo)
   return (
@@ -74,12 +82,10 @@ function ehLinhaTitulo(linha: string): boolean {
 }
 
 function dividirTextoPorTitulos(texto: string) {
-  const linhas = texto.replace(/\r\n?/g, "\n").split("\n")
+  const linhas = normalizarEntradaTexto(texto).split("\n")
   const blocos: string[] = []
   let blocoAtual: string[] = []
   let linhaAnteriorVazia = false
-
-  console.log(`[PARSE] Total de linhas: ${linhas.length}`)
 
   for (let i = 0; i < linhas.length; i++) {
     const linhaOriginal = linhas[i]
@@ -94,24 +100,16 @@ function dividirTextoPorTitulos(texto: string) {
     }
 
     const ehTitulo = ehLinhaTitulo(linha)
-    if (ehTitulo && linhaAnteriorVazia) {
-      console.log(`[TÍTULO] Linha ${i}: "${linha.substring(0, 50)}..."`)
-    }
 
     // Se a linha anterior era vazia (parágrafo) e esta linha parece um título, inicia novo bloco
     // Validação: linha anterior deve terminar com ponto final (com ou sem espaços)
     if (linhaAnteriorVazia && ehTitulo && blocoAtual.length > 0) {
       // Verifica se a última linha não-vazia do bloco anterior termina com ponto
       const ultimaLinhaBloco = blocoAtual.filter((l) => l.trim()).slice(-1)[0]
-      const temPonto = ultimaLinhaBloco && /\.$/.test(ultimaLinhaBloco.trim())
-      
-      console.log(`[DIVISÃO] Última linha do bloco: "${ultimaLinhaBloco?.substring(0, 30)}..." | Tem ponto: ${temPonto}`)
-      
-      if (temPonto) {
+      if (ultimaLinhaBloco && /\.$/.test(ultimaLinhaBloco.trim())) {
         const blocoAnterior = blocoAtual.join("\n").trim()
 
         if (blocoAnterior) {
-          console.log(`[PUSH] Bloco ${blocos.length + 1} com título: "${blocoAnterior.split("\n")[0]}"`)
           blocos.push(blocoAnterior)
         }
 
@@ -128,16 +126,56 @@ function dividirTextoPorTitulos(texto: string) {
   const ultimoBloco = blocoAtual.join("\n").trim()
 
   if (ultimoBloco) {
-    console.log(`[PUSH] Último bloco com título: "${ultimoBloco.split("\n")[0]}"`)
     blocos.push(ultimoBloco)
   }
 
-  console.log(`[FINAL] Total de blocos: ${blocos.length}`)
+  return blocos
+}
+
+function dividirTextoPorTitulosPorIndice(texto: string): string[] {
+  const linhas = normalizarEntradaTexto(texto).split("\n")
+  const indicesTitulos: number[] = []
+
+  linhas.forEach((linha, index) => {
+    if (ehLinhaTitulo(linha.trim())) {
+      indicesTitulos.push(index)
+    }
+  })
+
+  if (indicesTitulos.length === 0) {
+    return []
+  }
+
+  const blocos: string[] = []
+
+  for (let i = 0; i < indicesTitulos.length; i++) {
+    const inicio = indicesTitulos[i]
+    const fim = i + 1 < indicesTitulos.length ? indicesTitulos[i + 1] : linhas.length
+    const bloco = linhas
+      .slice(inicio, fim)
+      .map((linha) => linha.trimEnd())
+      .join("\n")
+      .trim()
+
+    if (bloco) {
+      blocos.push(bloco)
+    }
+  }
+
   return blocos
 }
 
 export function processarTexto(texto: string) {
-  const blocos = dividirTextoPorTitulos(texto)
+  const textoNormalizado = normalizarEntradaTexto(texto)
+  let blocos = dividirTextoPorTitulos(textoNormalizado)
+
+  // Fallback: se a regra por parágrafo não dividir, usa fronteiras por títulos.
+  if (blocos.length <= 1) {
+    const blocosPorTitulo = dividirTextoPorTitulosPorIndice(textoNormalizado)
+    if (blocosPorTitulo.length > blocos.length) {
+      blocos = blocosPorTitulo
+    }
+  }
 
   const resultado: {
     titulo: string
