@@ -44,7 +44,9 @@ function ehLinhaTitulo(linha: string): boolean {
     return false
   }
 
-  if (valor !== valor.toUpperCase()) {
+  const temLetraMinuscula = /[a-zá-ú]/.test(valor)
+
+  if (temLetraMinuscula) {
     return false
   }
 
