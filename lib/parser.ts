@@ -27,8 +27,77 @@ function ehAtoEspecial(titulo: string): boolean {
   )
 }
 
+function ehLinhaTitulo(linha: string): boolean {
+  const valor = linha.trim()
+
+  if (!valor) {
+    return false
+  }
+
+  const normalizado = normalizarTitulo(valor)
+
+  if (ehAtoEspecial(normalizado)) {
+    return true
+  }
+
+  if (/[.:;]$/.test(valor) || valor.includes(":")) {
+    return false
+  }
+
+  if (valor !== valor.toUpperCase()) {
+    return false
+  }
+
+  const letrasMaiusculas = normalizado.replace(/[^A-ZÀ-Ú]/g, "")
+
+  if (letrasMaiusculas.length < 4) {
+    return false
+  }
+
+  return true
+}
+
+function dividirTextoPorTitulos(texto: string) {
+  const linhas = texto.replace(/\r\n?/g, "\n").split("\n")
+  const blocos: string[] = []
+  let blocoAtual: string[] = []
+
+  for (const linhaOriginal of linhas) {
+    const linha = linhaOriginal.trimEnd()
+
+    if (!linha.trim()) {
+      if (blocoAtual.length > 0) {
+        blocoAtual.push("")
+      }
+
+      continue
+    }
+
+    if (ehLinhaTitulo(linha) && blocoAtual.length > 0) {
+      const blocoAnterior = blocoAtual.join("\n").trim()
+
+      if (blocoAnterior) {
+        blocos.push(blocoAnterior)
+      }
+
+      blocoAtual = [linha.trim()]
+      continue
+    }
+
+    blocoAtual.push(linha.trim())
+  }
+
+  const ultimoBloco = blocoAtual.join("\n").trim()
+
+  if (ultimoBloco) {
+    blocos.push(ultimoBloco)
+  }
+
+  return blocos
+}
+
 export function processarTexto(texto: string) {
-  const blocos = texto.split("\n\n")
+  const blocos = dividirTextoPorTitulos(texto)
 
   const resultado: {
     titulo: string
