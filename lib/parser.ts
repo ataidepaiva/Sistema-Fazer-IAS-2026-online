@@ -40,18 +40,16 @@ function ehLinhaTitulo(linha: string): boolean {
     return true
   }
 
-  // Debug: log das primeiras linhas que parecem títulos
-  if (valor.length > 30 && /ATO/.test(valor)) {
-    console.log(
-      `[TÍTULO] "${valor.substring(0, 60)}..." => chars: ${[...valor].slice(32, 55).map((c) => `${c}(${c.charCodeAt(0)})`).join(",")}`
-    )
-  }
-
-  // Padrão específico: MAIÚSCULAS – ATO Nº XX-XX
+  // Padrão: Se contém "ATO" e ("Nº" ou "No") e termina com números e hífens/travessões
   // Exemplos: "DESIGNAÇÃO DE LOCAL DE EXERCÍCIO – ATO Nº 07-25"
   //           "AFASTAMENTO PRELIMINAR À APOSENTADORIA – ATO Nº 21 -25"
-  if (/[A-ZÀÁÂÃÄÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜ][A-ZÀÁÂÃÄÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜ\s]+[–—-]\s*ATO\s*N[ºo]\s*\d+\s*[-–]\s*\d+/.test(valor)) {
-    return true
+  if (/ATO\s+N[ºo0O]\s*[\d\s\-–—]+/.test(valor) && /[\d\-–—]$/.test(valor)) {
+    // Verifica se tem pelo menos algumas letras maiúsculas antes de "ATO"
+    const antesAto = valor.split(/ATO/i)[0]
+    const letrasMaiusculas = antesAto.replace(/[^A-ZÀÁÂÃÄÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜ]/g, "")
+    if (letrasMaiusculas.length >= 3) {
+      return true
+    }
   }
 
   // Rejeita linhas que terminam com ponto, dois-pontos ou ponto-e-vírgula
