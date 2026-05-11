@@ -92,16 +92,21 @@ function dividirTextoPorTitulos(texto: string) {
     }
 
     // Se a linha anterior era vazia (parágrafo) e esta linha parece um título, inicia novo bloco
+    // Validação: linha anterior deve terminar com ponto final (com ou sem espaços)
     if (linhaAnteriorVazia && ehLinhaTitulo(linha) && blocoAtual.length > 0) {
-      const blocoAnterior = blocoAtual.join("\n").trim()
+      // Verifica se a última linha não-vazia do bloco anterior termina com ponto
+      const ultimaLinhaBloco = blocoAtual.filter((l) => l.trim()).slice(-1)[0]
+      if (ultimaLinhaBloco && /\.$/.test(ultimaLinhaBloco.trim())) {
+        const blocoAnterior = blocoAtual.join("\n").trim()
 
-      if (blocoAnterior) {
-        blocos.push(blocoAnterior)
+        if (blocoAnterior) {
+          blocos.push(blocoAnterior)
+        }
+
+        blocoAtual = [linha.trim()]
+        linhaAnteriorVazia = false
+        continue
       }
-
-      blocoAtual = [linha.trim()]
-      linhaAnteriorVazia = false
-      continue
     }
 
     linhaAnteriorVazia = false
