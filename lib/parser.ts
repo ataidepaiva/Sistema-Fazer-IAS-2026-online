@@ -40,23 +40,25 @@ function ehLinhaTitulo(linha: string): boolean {
     return true
   }
 
+  // Rejeita linhas que terminam com ponto, dois-pontos ou ponto-e-vírgula
   if (/[.:;]$/.test(valor) || valor.includes(":")) {
-    return false
-  }
-
-  const temLetraMinuscula = /[a-zá-ú]/.test(valor)
-
-  if (temLetraMinuscula) {
     return false
   }
 
   const letrasMaiusculas = normalizado.replace(/[^A-ZÀ-Ú]/g, "")
 
+  // Precisa de pelo menos 4 letras maiúsculas
   if (letrasMaiusculas.length < 4) {
     return false
   }
 
-  return true
+  // Conta letras minúsculas (excluindo acentos e caracteres especiais)
+  const letrasMinusculas = valor.replace(/[^a-zá-ú]/gi, "").replace(/[A-ZÀ-Ú]/g, "")
+  
+  // Tolera até 20% de letras minúsculas para casos como "À APOSENTADORIA"
+  const percentualMinusculas = letrasMinusculas.length / (letrasMaiusculas.length + letrasMinusculas.length)
+
+  return percentualMinusculas < 0.2
 }
 
 function dividirTextoPorTitulos(texto: string) {
