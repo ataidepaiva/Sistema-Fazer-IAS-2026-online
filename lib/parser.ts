@@ -40,8 +40,10 @@ function ehLinhaTitulo(linha: string): boolean {
     return true
   }
 
-  // Se contém "ATO Nº" é muito provavelmente um título
-  if (/ATO\s*N[ºo]/i.test(valor)) {
+  // Padrão específico: MAIÚSCULAS – ATO Nº XX-XX
+  // Exemplos: "DESIGNAÇÃO DE LOCAL DE EXERCÍCIO – ATO Nº 07-25"
+  //           "AFASTAMENTO PRELIMINAR À APOSENTADORIA – ATO Nº 21 -25"
+  if (/[A-ZÀÁÂÃÄÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜ][A-ZÀÁÂÃÄÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜ\s]+[–—-]\s*ATO\s*N[ºo]\s*\d+\s*[-–]\s*\d+/.test(valor)) {
     return true
   }
 
