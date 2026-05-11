@@ -77,19 +77,22 @@ function dividirTextoPorTitulos(texto: string) {
   const linhas = texto.replace(/\r\n?/g, "\n").split("\n")
   const blocos: string[] = []
   let blocoAtual: string[] = []
+  let linhaAnteriorVazia = false
 
-  for (const linhaOriginal of linhas) {
+  for (let i = 0; i < linhas.length; i++) {
+    const linhaOriginal = linhas[i]
     const linha = linhaOriginal.trimEnd()
 
     if (!linha.trim()) {
+      linhaAnteriorVazia = true
       if (blocoAtual.length > 0) {
         blocoAtual.push("")
       }
-
       continue
     }
 
-    if (ehLinhaTitulo(linha) && blocoAtual.length > 0) {
+    // Se a linha anterior era vazia (parágrafo) e esta linha parece um título, inicia novo bloco
+    if (linhaAnteriorVazia && ehLinhaTitulo(linha) && blocoAtual.length > 0) {
       const blocoAnterior = blocoAtual.join("\n").trim()
 
       if (blocoAnterior) {
@@ -97,9 +100,11 @@ function dividirTextoPorTitulos(texto: string) {
       }
 
       blocoAtual = [linha.trim()]
+      linhaAnteriorVazia = false
       continue
     }
 
+    linhaAnteriorVazia = false
     blocoAtual.push(linha.trim())
   }
 
