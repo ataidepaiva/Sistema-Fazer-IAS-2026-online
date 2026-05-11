@@ -40,6 +40,11 @@ function ehLinhaTitulo(linha: string): boolean {
     return true
   }
 
+  // Se contém "ATO Nº" é muito provavelmente um título
+  if (/ATO\s*N[ºo]/i.test(valor)) {
+    return true
+  }
+
   // Rejeita linhas que terminam com ponto, dois-pontos ou ponto-e-vírgula
   if (/[.:;]$/.test(valor) || valor.includes(":")) {
     return false
