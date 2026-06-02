@@ -12,8 +12,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
-  const perfil = request.cookies.get("sinfo-auth")?.value
-  const autenticado = perfil === "user" || perfil === "admin"
+  const temSessao = Boolean(request.cookies.get("sinfo-session")?.value)
+  const perfilLegacy = request.cookies.get("sinfo-auth")?.value
+  const autenticadoLegacy = perfilLegacy === "user" || perfilLegacy === "admin"
+  const autenticado = temSessao || autenticadoLegacy
 
   const rotasProtegidas = ["/dashboard", "/lauda"]
   const rotaProtegida = rotasProtegidas.some((rota) => pathname.startsWith(rota))

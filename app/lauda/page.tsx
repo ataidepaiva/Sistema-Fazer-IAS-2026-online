@@ -13,19 +13,9 @@ export default function Lauda() {
   const [gerando, setGerando] = useState(false)
   const [progresso, setProgresso] = useState(0)
   const [tempoDecorrido, setTempoDecorrido] = useState(0)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [mensagemModelo, setMensagemModelo] = useState("")
   const inicioRef = useRef<number | null>(null)
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => {
-    const perfil = document.cookie
-      .split("; ")
-      .find((item) => item.startsWith("sinfo-role="))
-      ?.split("=")[1]
-
-    setIsAdmin(perfil === "admin")
-  }, [])
 
   useEffect(() => {
     if (!gerando) return
@@ -197,15 +187,14 @@ export default function Lauda() {
         </nav>
 
         <div className="mt-auto pt-6">
-          {isAdmin && (
-            <div className="space-y-2 border-t border-blue-800/70 pt-4">
+          <div className="space-y-2 border-t border-blue-800/70 pt-4">
               <button
                 type="button"
                 onClick={baixarModelo}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
               >
                 <Download className="h-4 w-4" />
-                Baixar modelo de IA
+                Baixar meu modelo
               </button>
 
               <button
@@ -214,14 +203,13 @@ export default function Lauda() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-500"
               >
                 <Upload className="h-4 w-4" />
-                Subir novo modelo
+                Subir meu modelo
               </button>
 
               <input ref={inputModeloRef} type="file" accept=".docx" className="hidden" onChange={subirNovoModelo} />
 
               {mensagemModelo ? <p className="text-xs text-blue-100/90">{mensagemModelo}</p> : null}
-            </div>
-          )}
+          </div>
 
           <div className="pt-6 text-xs opacity-70">SRE Varginha</div>
           <div className="pt-1 text-xs opacity-70">© {new Date().getFullYear()} Desenvolvido por Ataide de Paula Paiva - Todos os Direitos Reservados</div>

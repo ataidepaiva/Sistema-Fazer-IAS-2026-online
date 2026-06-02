@@ -1,40 +1,61 @@
 import { NextResponse } from "next/server"
+import { autenticarUsuario, criarSessao, obterDuracaoSessaoSegundos } from "@/lib/auth"
 
-const USUARIO_COMUM = process.env.USER_USERNAME?.trim()
-const SENHA_COMUM = process.env.USER_PASSWORD?.trim()
-const USUARIO_ADMIN = process.env.ADMIN_USERNAME?.trim() || "admin"
-const SENHA_ADMIN = process.env.ADMIN_PASSWORD?.trim()
-
-function obterPerfil(usuario: string, senha: string) {
-  if (USUARIO_COMUM && SENHA_COMUM && usuario === USUARIO_COMUM && senha === SENHA_COMUM) return "user"
-  if (SENHA_ADMIN && usuario === USUARIO_ADMIN && senha === SENHA_ADMIN) return "admin"
-  return null
-}
+export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
-  const usuario = body?.usuario?.trim()
-  const senha = body?.senha?.trim()
-  const perfil = obterPerfil(usuario, senha)
+  const usuario = body?.usuario?.trim() || ""
+  const senha = body?.senha?.trim() || ""
+  const usuarioAutenticado = await autenticarUsuario(usuario, senha)
 
-  if (!perfil) {
+  if (!usuarioAutenticado) {
     return NextResponse.json({ error: "Usuário ou senha inválidos" }, { status: 401 })
   }
 
-  const response = NextResponse.json({ ok: true, perfil })
+  const sessao = await criarSessao(usuarioAutenticado)
 
-  response.cookies.set("sinfo-auth", perfil, {
+  const response = NextResponse.json({ ok: true, perfil: sessao.perfil, usuario: sessao.usuario })
+  const maxAge = obterDuracaoSessaoSegundos()
+
+  response.cookies.set("sinfo-session", sessao.token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge,
   })
 
-  response.cookies.set("sinfo-role", perfil, {
+  response.cookies.set("sinfo-auth", sessao.perfil, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+  })
+
+  response.cookies.set("sinfo-user", sessao.usuario, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+  })
+
+  response.cookies.set("sinfo-user-key", sessao.chave, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+  })
+
+  response.cookies.set("sinfo-role", sessao.perfil, {
     httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge,
   })
 
   return response

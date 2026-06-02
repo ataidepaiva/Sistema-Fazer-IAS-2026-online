@@ -15,23 +15,24 @@ export function limparCacheModelo(modeloPath?: string) {
   cacheModelos.clear()
 }
 
-async function lerModelo(modeloPath: string) {
-  const modeloEmCache = cacheModelos.get(modeloPath)
+async function lerModelo(modeloPath: string, userKey?: string) {
+  const cacheKey = userKey ? `${modeloPath}::${userKey}` : modeloPath
+  const modeloEmCache = cacheModelos.get(cacheKey)
 
   if (modeloEmCache) {
     return modeloEmCache
   }
 
   const content = modeloPath === "modelo.docx"
-    ? (await lerModeloAtivoArquivo()).conteudo
+    ? (await lerModeloAtivoArquivo(userKey)).conteudo
     : await lerModeloArquivo(modeloPath)
 
-  cacheModelos.set(modeloPath, content)
+  cacheModelos.set(cacheKey, content)
   return content
 }
 
-export async function gerarDoc(modeloPath: string, dados: object) {
-  const content = await lerModelo(modeloPath)
+export async function gerarDoc(modeloPath: string, dados: object, userKey?: string) {
+  const content = await lerModelo(modeloPath, userKey)
 
   const zip = new PizZip(content.toString("binary"))
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })

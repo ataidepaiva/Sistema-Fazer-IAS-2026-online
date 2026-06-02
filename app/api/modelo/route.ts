@@ -1,35 +1,30 @@
 import { NextResponse } from "next/server"
 import { limparCacheModelo } from "@/lib/doc"
+import { obterSessaoAutenticada } from "@/lib/auth"
 import {
   excluirModeloCustomizado,
   lerModeloAtivoArquivo,
-  obterStatusModeloAtivo,
+  obterStatusModeloAtivoPorUsuario,
   salvarModeloCustomizado,
 } from "@/lib/model-storage"
 
 export const runtime = "nodejs"
 
-function usuarioEhAdmin(request: Request) {
-  const cookies = request.headers.get("cookie") || ""
-  return cookies
-    .split(";")
-    .map((item) => item.trim())
-    .includes("sinfo-auth=admin")
-}
-
 export async function GET(request: Request) {
-  if (!usuarioEhAdmin(request)) {
-    return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
+  const sessao = await obterSessaoAutenticada(request)
+
+  if (!sessao?.chave) {
+    return NextResponse.json({ error: "Sessão inválida ou expirada" }, { status: 401 })
   }
 
   const { searchParams } = new URL(request.url)
 
   if (searchParams.get("status") === "1") {
-    const status = await obterStatusModeloAtivo()
+    const status = await obterStatusModeloAtivoPorUsuario(sessao.chave)
     return NextResponse.json({ ok: true, modeloAtivo: status })
   }
 
-  const modelo = await lerModeloAtivoArquivo()
+  const modelo = await lerModeloAtivoArquivo(sessao.chave)
 
   return new Response(new Uint8Array(modelo.conteudo), {
     headers: {
@@ -40,8 +35,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!usuarioEhAdmin(request)) {
-    return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
+  const sessao = await obterSessaoAutenticada(request)
+
+  if (!sessao?.chave) {
+    return NextResponse.json({ error: "Sessão inválida ou expirada" }, { status: 401 })
   }
 
   const formData = await request.formData()
@@ -62,10 +59,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    await salvarModeloCustomizado(buffer)
-    limparCacheModelo("modelo.docx")
+    await salvarModeloCustomizado(buffer, sessao.chave)
+    limparCacheModelo(`modelo.docx::${sessao.chave}`)
 
-    const status = await obterStatusModeloAtivo()
+    const status = await obterStatusModeloAtivoPorUsuario(sessao.chave)
     return NextResponse.json({ ok: true, arquivo: arquivo.name, modeloAtivo: status })
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : "Falha ao atualizar o modelo"
@@ -74,22 +71,24 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!usuarioEhAdmin(request)) {
-    return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
+  const sessao = await obterSessaoAutenticada(request)
+
+  if (!sessao?.chave) {
+    return NextResponse.json({ error: "Sessão inválida ou expirada" }, { status: 401 })
   }
 
   try {
-    const resultado = await excluirModeloCustomizado()
-    limparCacheModelo("modelo.docx")
-    const status = await obterStatusModeloAtivo()
+    const resultado = await excluirModeloCustomizado(sessao.chave)
+    limparCacheModelo(`modelo.docx::${sessao.chave}`)
+    const status = await obterStatusModeloAtivoPorUsuario(sessao.chave)
 
     return NextResponse.json({
       ok: true,
       removido: resultado.removido,
       modeloAtivo: status,
       mensagem: resultado.removido
-        ? "Modelo personalizado excluído. O sistema voltou para o modelo padrão."
-        : "Não havia modelo personalizado para excluir. O sistema já está usando o modelo padrão.",
+        ? "Seu modelo personalizado foi excluído. O sistema voltou para o modelo padrão."
+        : "Você não tinha modelo personalizado. O sistema já está usando o modelo padrão.",
     })
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : "Falha ao excluir modelo personalizado"

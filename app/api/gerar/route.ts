@@ -1,9 +1,12 @@
 import { PassThrough } from "stream"
 import archiver from "archiver"
 import { gerarDoc } from "@/lib/doc"
+import { obterSessaoAutenticada } from "@/lib/auth"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
+const LIMITE_CONCORRENCIA_POR_USUARIO = 1
+const geracoesEmAndamento = new Map<string, number>()
 
 interface Registro {
   titulo: string
@@ -99,11 +102,11 @@ async function mesclarDocs(buffers: Buffer[]) {
   })
 }
 
-async function gerarDocsEmLotes(registros: ReturnType<typeof normalizarRegistro>[]) {
+async function gerarDocsEmLotes(registros: ReturnType<typeof normalizarRegistro>[], userKey: string) {
   const buffers: Buffer[] = []
 
   for (let index = 0; index < registros.length; index += 1) {
-    buffers.push(await gerarDoc("modelo.docx", registros[index]))
+    buffers.push(await gerarDoc("modelo.docx", registros[index], userKey))
 
     if ((index + 1) % 25 === 0) {
       await new Promise<void>((resolve) => setImmediate(resolve))
@@ -159,7 +162,27 @@ async function gerarZipComDocumentos(documentos: Array<{ nomeArquivo: string; bu
 }
 
 export async function POST(req: Request) {
+  let chaveSessao = ""
+
   try {
+    const sessao = await obterSessaoAutenticada(req)
+
+    if (!sessao?.chave) {
+      return Response.json({ error: "Sessão inválida ou expirada" }, { status: 401 })
+    }
+
+    chaveSessao = sessao.chave
+    const execucoesAtuais = geracoesEmAndamento.get(chaveSessao) || 0
+
+    if (execucoesAtuais >= LIMITE_CONCORRENCIA_POR_USUARIO) {
+      return Response.json(
+        { error: "Voce ja possui uma geracao em andamento. Aguarde a conclusao para iniciar outra." },
+        { status: 429 }
+      )
+    }
+
+    geracoesEmAndamento.set(chaveSessao, execucoesAtuais + 1)
+
     const body = await req.json().catch(() => null)
     const registros = body?.registros as Registro[] | undefined
 
@@ -176,7 +199,7 @@ export async function POST(req: Request) {
 
     if (gruposPorTitulo.length === 1) {
       const nomeArquivo = sanitizarNomeArquivo(gruposPorTitulo[0]?.titulo)
-      const docs = await gerarDocsEmLotes(gruposPorTitulo[0].registros)
+      const docs = await gerarDocsEmLotes(gruposPorTitulo[0].registros, sessao.chave)
       const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
       const payload = new Uint8Array(buffer)
 
@@ -191,7 +214,7 @@ export async function POST(req: Request) {
     const documentosPorTitulo: Array<{ nomeArquivo: string; buffer: Buffer }> = []
 
     for (const grupo of gruposPorTitulo) {
-      const docs = await gerarDocsEmLotes(grupo.registros)
+      const docs = await gerarDocsEmLotes(grupo.registros, sessao.chave)
       const buffer = docs.length === 1 ? docs[0] : await mesclarDocs(docs)
 
       documentosPorTitulo.push({
@@ -213,5 +236,15 @@ export async function POST(req: Request) {
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : "Falha inesperada ao gerar documento"
     return Response.json({ error: mensagem }, { status: 500 })
+  } finally {
+    if (chaveSessao) {
+      const restante = (geracoesEmAndamento.get(chaveSessao) || 1) - 1
+
+      if (restante > 0) {
+        geracoesEmAndamento.set(chaveSessao, restante)
+      } else {
+        geracoesEmAndamento.delete(chaveSessao)
+      }
+    }
   }
 }

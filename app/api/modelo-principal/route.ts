@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server"
+import { obterSessaoAutenticada } from "@/lib/auth"
 import { obterStatusModeloPrincipal, salvarModeloPrincipalImutavel } from "@/lib/model-storage"
 
 export const runtime = "nodejs"
 
-function usuarioEhAdmin(request: Request) {
-  const cookies = request.headers.get("cookie") || ""
-  return cookies
-    .split(";")
-    .map((item) => item.trim())
-    .includes("sinfo-auth=admin")
+async function usuarioEhAdmin(request: Request) {
+  const sessao = await obterSessaoAutenticada(request)
+  return sessao?.perfil === "admin"
 }
 
 export async function GET(request: Request) {
-  if (!usuarioEhAdmin(request)) {
+  if (!(await usuarioEhAdmin(request))) {
     return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
   }
 
@@ -21,7 +19,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!usuarioEhAdmin(request)) {
+  if (!(await usuarioEhAdmin(request))) {
     return NextResponse.json({ error: "Acesso restrito ao administrador" }, { status: 403 })
   }
 

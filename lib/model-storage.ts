@@ -8,9 +8,18 @@ const NOME_MODELO_PADRAO = "modelo.docx"
 const NOME_MODELO_CUSTOM = "modelo_custom.docx"
 const ID_REGISTRO_MODELO_CUSTOM = 1
 const ID_REGISTRO_MODELO_PRINCIPAL = 1
+const CHAVE_MODELO_GLOBAL_LEGADO = "global"
 
 function obterCaminhoLocal(nomeArquivo = NOME_MODELO_PADRAO) {
   return path.join(process.cwd(), nomeArquivo)
+}
+
+function obterNomeArquivoCustomLocalPorUsuario(userKey: string) {
+  const chaveSegura = (userKey || CHAVE_MODELO_GLOBAL_LEGADO)
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .slice(0, 80)
+
+  return `${NOME_MODELO_CUSTOM}.${chaveSegura}`
 }
 
 async function garantirTabelaModelos() {
@@ -29,6 +38,15 @@ async function garantirTabelaModelos() {
     )
   `)
 
+  await cliente.execute(`
+    CREATE TABLE IF NOT EXISTS modelos_usuario (
+      user_key TEXT PRIMARY KEY,
+      nome_arquivo TEXT NOT NULL,
+      conteudo BLOB NOT NULL,
+      atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
   return cliente
 }
 
@@ -38,6 +56,15 @@ async function garantirTabelaModelosObrigatoria() {
   await cliente.execute(`
     CREATE TABLE IF NOT EXISTS modelos (
       id INTEGER PRIMARY KEY CHECK (id = 1),
+      nome_arquivo TEXT NOT NULL,
+      conteudo BLOB NOT NULL,
+      atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  await cliente.execute(`
+    CREATE TABLE IF NOT EXISTS modelos_usuario (
+      user_key TEXT PRIMARY KEY,
       nome_arquivo TEXT NOT NULL,
       conteudo BLOB NOT NULL,
       atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
@@ -81,7 +108,38 @@ async function garantirTabelaModeloPrincipalObrigatoria() {
   return cliente
 }
 
-async function lerModeloCustomTurso() {
+async function lerModeloCustomTurso(userKey: string) {
+  const cliente = await garantirTabelaModelos()
+
+  if (!cliente) {
+    return null
+  }
+
+  const resultado = await cliente.execute({
+    sql: "SELECT nome_arquivo, conteudo FROM modelos_usuario WHERE user_key = ?",
+    args: [userKey],
+  })
+
+  const linha = resultado.rows[0]
+
+  if (!linha) {
+    return null
+  }
+
+  const nomeArquivo = String(linha.nome_arquivo || NOME_MODELO_CUSTOM)
+  const conteudo = converterConteudoParaBuffer(linha.conteudo)
+
+  if (!conteudo) {
+    return null
+  }
+
+  return {
+    nomeArquivo,
+    conteudo,
+  }
+}
+
+async function lerModeloCustomTursoLegadoGlobal() {
   const cliente = await garantirTabelaModelos()
 
   if (!cliente) {
@@ -199,23 +257,40 @@ export async function lerModeloArquivo(nomeArquivo = NOME_MODELO_PADRAO) {
   throw new Error(`Modelo não encontrado: ${nomeArquivo}`)
 }
 
-export async function lerModeloAtivoArquivo() {
+export async function lerModeloAtivoArquivo(userKey = CHAVE_MODELO_GLOBAL_LEGADO) {
   let customTurso = null
 
   try {
-    customTurso = await lerModeloCustomTurso()
+    customTurso = await lerModeloCustomTurso(userKey)
   } catch {
     customTurso = null
+  }
+
+  if (!customTurso && userKey === CHAVE_MODELO_GLOBAL_LEGADO) {
+    try {
+      customTurso = await lerModeloCustomTursoLegadoGlobal()
+    } catch {
+      customTurso = null
+    }
   }
 
   if (customTurso) {
     return { conteudo: customTurso.conteudo, nomeArquivo: customTurso.nomeArquivo, origem: "custom" as const }
   }
 
-  const customLocal = await lerArquivoLocal(NOME_MODELO_CUSTOM)
+  const nomeArquivoLocalPorUsuario = obterNomeArquivoCustomLocalPorUsuario(userKey)
+  const customLocal = await lerArquivoLocal(nomeArquivoLocalPorUsuario)
+
+  if (!customLocal && userKey === CHAVE_MODELO_GLOBAL_LEGADO) {
+    const customLocalLegado = await lerArquivoLocal(NOME_MODELO_CUSTOM)
+
+    if (customLocalLegado) {
+      return { conteudo: customLocalLegado, nomeArquivo: NOME_MODELO_CUSTOM, origem: "custom" as const }
+    }
+  }
 
   if (customLocal) {
-    return { conteudo: customLocal, nomeArquivo: NOME_MODELO_CUSTOM, origem: "custom" as const }
+    return { conteudo: customLocal, nomeArquivo: nomeArquivoLocalPorUsuario, origem: "custom" as const }
   }
 
   try {
@@ -270,20 +345,20 @@ export async function obterStatusModeloPrincipal() {
   }
 }
 
-export async function salvarModeloCustomizado(buffer: Buffer) {
+export async function salvarModeloCustomizado(buffer: Buffer, userKey = CHAVE_MODELO_GLOBAL_LEGADO) {
   const cliente = process.env.VERCEL ? await garantirTabelaModelosObrigatoria() : await garantirTabelaModelos()
 
   if (cliente) {
     await cliente.execute({
       sql: `
-        INSERT INTO modelos (id, nome_arquivo, conteudo, atualizado_em)
+        INSERT INTO modelos_usuario (user_key, nome_arquivo, conteudo, atualizado_em)
         VALUES (?, ?, ?, datetime('now'))
-        ON CONFLICT(id) DO UPDATE SET
+        ON CONFLICT(user_key) DO UPDATE SET
           nome_arquivo = excluded.nome_arquivo,
           conteudo = excluded.conteudo,
           atualizado_em = datetime('now')
       `,
-      args: [ID_REGISTRO_MODELO_CUSTOM, NOME_MODELO_CUSTOM, buffer],
+      args: [userKey, NOME_MODELO_CUSTOM, buffer],
     })
 
     return { destino: "turso" }
@@ -293,24 +368,24 @@ export async function salvarModeloCustomizado(buffer: Buffer) {
     throw new Error("Configure TURSO_DATABASE_URL e TURSO_AUTH_TOKEN para permitir upload do modelo na Vercel")
   }
 
-  await fs.writeFile(obterCaminhoLocal(NOME_MODELO_CUSTOM), buffer)
+  await fs.writeFile(obterCaminhoLocal(obterNomeArquivoCustomLocalPorUsuario(userKey)), buffer)
   return { destino: "local" }
 }
 
-export async function excluirModeloCustomizado() {
+export async function excluirModeloCustomizado(userKey = CHAVE_MODELO_GLOBAL_LEGADO) {
   const cliente = process.env.VERCEL ? await garantirTabelaModelosObrigatoria() : await garantirTabelaModelos()
 
   if (cliente) {
     const resultado = await cliente.execute({
-      sql: "DELETE FROM modelos WHERE id = ?",
-      args: [ID_REGISTRO_MODELO_CUSTOM],
+      sql: "DELETE FROM modelos_usuario WHERE user_key = ?",
+      args: [userKey],
     })
 
     return { destino: "turso" as const, removido: (resultado.rowsAffected || 0) > 0 }
   }
 
   try {
-    await fs.unlink(obterCaminhoLocal(NOME_MODELO_CUSTOM))
+    await fs.unlink(obterCaminhoLocal(obterNomeArquivoCustomLocalPorUsuario(userKey)))
     return { destino: "local" as const, removido: true }
   } catch (error) {
     const erro = error as NodeJS.ErrnoException
@@ -324,7 +399,16 @@ export async function excluirModeloCustomizado() {
 }
 
 export async function obterStatusModeloAtivo() {
-  const modelo = await lerModeloAtivoArquivo()
+  const modelo = await lerModeloAtivoArquivo(CHAVE_MODELO_GLOBAL_LEGADO)
+
+  return {
+    nomeArquivo: modelo.nomeArquivo,
+    origem: modelo.origem,
+  }
+}
+
+export async function obterStatusModeloAtivoPorUsuario(userKey: string) {
+  const modelo = await lerModeloAtivoArquivo(userKey)
 
   return {
     nomeArquivo: modelo.nomeArquivo,

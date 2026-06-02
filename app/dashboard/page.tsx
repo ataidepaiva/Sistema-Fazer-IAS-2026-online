@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight, Upload, Trash2 } from "lucide-react"
+import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight, Upload, Trash2, Users } from "lucide-react"
 
 interface Registro {
   titulo: string
@@ -15,6 +15,14 @@ interface Registro {
   pagina: string
   coluna: string
   data: string
+}
+
+interface UsuarioSistema {
+  id: number
+  usuario: string
+  perfil: "user" | "admin"
+  ativo: boolean
+  criadoEm: string
 }
 
 export default function Dashboard() {
@@ -30,9 +38,18 @@ export default function Dashboard() {
   const [gerandoDocumento, setGerandoDocumento] = useState(false)
   const [progressoGeracao, setProgressoGeracao] = useState(0)
   const [tempoDecorridoSegundos, setTempoDecorridoSegundos] = useState(0)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [mensagemModelo, setMensagemModelo] = useState("")
   const [nomeModeloAtivo, setNomeModeloAtivo] = useState("modelo.docx")
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [usuariosSistema, setUsuariosSistema] = useState<UsuarioSistema[]>([])
+  const [carregandoUsuarios, setCarregandoUsuarios] = useState(false)
+  const [mensagemUsuarios, setMensagemUsuarios] = useState("")
+  const [salvandoUsuarioId, setSalvandoUsuarioId] = useState<number | null>(null)
+  const [perfilEdicao, setPerfilEdicao] = useState<Record<number, "user" | "admin">>({})
+  const [senhaEdicao, setSenhaEdicao] = useState<Record<number, string>>({})
+  const [novoUsuario, setNovoUsuario] = useState("")
+  const [novaSenha, setNovaSenha] = useState("")
+  const [novoPerfil, setNovoPerfil] = useState<"user" | "admin">("user")
   const inicioGeracaoRef = useRef<number | null>(null)
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
 
@@ -42,13 +59,17 @@ export default function Dashboard() {
       .find((item) => item.startsWith("sinfo-role="))
       ?.split("=")[1]
 
-    const admin = perfil === "admin"
-    setIsAdmin(admin)
-
-    if (admin) {
-      void carregarStatusModelo()
-    }
+    setIsAdmin(perfil === "admin")
+    void carregarStatusModelo()
   }, [])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return
+    }
+
+    void carregarUsuariosSistema()
+  }, [isAdmin])
 
   async function carregarStatusModelo() {
     try {
@@ -265,6 +286,183 @@ export default function Dashboard() {
     }
   }
 
+  async function carregarUsuariosSistema() {
+    setCarregandoUsuarios(true)
+    setMensagemUsuarios("")
+
+    try {
+      const resposta = await fetch("/api/usuarios")
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemUsuarios(json?.error || "Falha ao listar usuarios")
+        return
+      }
+
+      const usuarios = Array.isArray(json?.usuarios) ? json.usuarios : []
+      setUsuariosSistema(usuarios)
+      setPerfilEdicao(() => {
+        const proximo: Record<number, "user" | "admin"> = {}
+
+        usuarios.forEach((usuario: UsuarioSistema) => {
+          proximo[usuario.id] = usuario.perfil
+        })
+
+        return proximo
+      })
+    } catch {
+      setMensagemUsuarios("Falha ao listar usuarios")
+    } finally {
+      setCarregandoUsuarios(false)
+    }
+  }
+
+  async function criarNovoUsuario() {
+    if (!novoUsuario.trim() || !novaSenha.trim()) {
+      setMensagemUsuarios("Informe usuario e senha para criar")
+      return
+    }
+
+    setMensagemUsuarios("Criando usuario...")
+
+    try {
+      const resposta = await fetch("/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario: novoUsuario.trim(), senha: novaSenha, perfil: novoPerfil }),
+      })
+
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemUsuarios(json?.error || "Falha ao criar usuario")
+        return
+      }
+
+      const usuarios = Array.isArray(json?.usuarios) ? json.usuarios : []
+      setUsuariosSistema(usuarios)
+      setPerfilEdicao(() => {
+        const proximo: Record<number, "user" | "admin"> = {}
+
+        usuarios.forEach((usuario: UsuarioSistema) => {
+          proximo[usuario.id] = usuario.perfil
+        })
+
+        return proximo
+      })
+      setNovoUsuario("")
+      setNovaSenha("")
+      setNovoPerfil("user")
+      setMensagemUsuarios("Usuario criado com sucesso")
+    } catch {
+      setMensagemUsuarios("Falha ao criar usuario")
+    }
+  }
+
+  async function alternarStatusUsuario(usuario: UsuarioSistema) {
+    setSalvandoUsuarioId(usuario.id)
+    setMensagemUsuarios(`Atualizando usuario ${usuario.usuario}...`)
+
+    try {
+      const resposta = await fetch("/api/usuarios", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: usuario.id, ativo: !usuario.ativo }),
+      })
+
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemUsuarios(json?.error || "Falha ao atualizar usuario")
+        return
+      }
+
+      setUsuariosSistema((anterior) => anterior.map((item) => (item.id === usuario.id ? json?.usuario : item)))
+      setPerfilEdicao((anterior) => ({
+        ...anterior,
+        [usuario.id]: json?.usuario?.perfil === "admin" ? "admin" : "user",
+      }))
+      setMensagemUsuarios(`Usuario ${usuario.usuario} atualizado com sucesso`)
+    } catch {
+      setMensagemUsuarios("Falha ao atualizar usuario")
+    } finally {
+      setSalvandoUsuarioId(null)
+    }
+  }
+
+  async function salvarPerfilUsuario(usuario: UsuarioSistema) {
+    const perfil = perfilEdicao[usuario.id] || usuario.perfil
+
+    if (perfil === usuario.perfil) {
+      setMensagemUsuarios(`Nenhuma alteração de perfil para ${usuario.usuario}`)
+      return
+    }
+
+    setSalvandoUsuarioId(usuario.id)
+    setMensagemUsuarios(`Salvando perfil de ${usuario.usuario}...`)
+
+    try {
+      const resposta = await fetch("/api/usuarios", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: usuario.id, perfil }),
+      })
+
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemUsuarios(json?.error || "Falha ao atualizar perfil")
+        return
+      }
+
+      setUsuariosSistema((anterior) => anterior.map((item) => (item.id === usuario.id ? json?.usuario : item)))
+      setPerfilEdicao((anterior) => ({
+        ...anterior,
+        [usuario.id]: json?.usuario?.perfil === "admin" ? "admin" : "user",
+      }))
+      setMensagemUsuarios(`Perfil de ${usuario.usuario} atualizado com sucesso`)
+    } catch {
+      setMensagemUsuarios("Falha ao atualizar perfil")
+    } finally {
+      setSalvandoUsuarioId(null)
+    }
+  }
+
+  async function salvarSenhaUsuario(usuario: UsuarioSistema) {
+    const senha = (senhaEdicao[usuario.id] || "").trim()
+
+    if (!senha) {
+      setMensagemUsuarios(`Informe a nova senha de ${usuario.usuario}`)
+      return
+    }
+
+    setSalvandoUsuarioId(usuario.id)
+    setMensagemUsuarios(`Salvando senha de ${usuario.usuario}...`)
+
+    try {
+      const resposta = await fetch("/api/usuarios", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: usuario.id, senha }),
+      })
+
+      const json = await resposta.json().catch(() => null)
+
+      if (!resposta.ok) {
+        setMensagemUsuarios(json?.error || "Falha ao atualizar senha")
+        return
+      }
+
+      setUsuariosSistema((anterior) => anterior.map((item) => (item.id === usuario.id ? json?.usuario : item)))
+      setSenhaEdicao((anterior) => ({ ...anterior, [usuario.id]: "" }))
+      setMensagemUsuarios(`Senha de ${usuario.usuario} atualizada com sucesso`)
+    } catch {
+      setMensagemUsuarios("Falha ao atualizar senha")
+    } finally {
+      setSalvandoUsuarioId(null)
+    }
+  }
+
   async function sair() {
     await fetch("/api/logout", { method: "POST" })
     router.push("/login")
@@ -407,18 +605,30 @@ export default function Dashboard() {
             <ScrollText size={16} />
             Preparar Lauda
           </Link>
+
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab("users")}
+              className={cn(
+                "text-left px-4 py-3 rounded-xl flex items-center gap-2 transition-all font-medium",
+                activeTab === "users" ? "bg-blue-700 text-white shadow-md" : "text-blue-100 hover:bg-blue-800/80"
+              )}
+            >
+              <Users size={16} />
+              Usuários
+            </button>
+          )}
         </nav>
 
         <div className="mt-auto pt-6">
-          {isAdmin && (
-            <div className="space-y-2 border-t border-blue-800/70 pt-4">
+          <div className="space-y-2 border-t border-blue-800/70 pt-4">
               <button
                 type="button"
                 onClick={baixarModelo}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
               >
                 <Download className="h-4 w-4" />
-                Baixar modelo em uso
+                Baixar meu modelo
               </button>
 
               <button
@@ -427,7 +637,7 @@ export default function Dashboard() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-500"
               >
                 <Upload className="h-4 w-4" />
-                Subir novo modelo
+                Subir meu modelo
               </button>
 
               <button
@@ -436,14 +646,13 @@ export default function Dashboard() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
               >
                 <Trash2 className="h-4 w-4" />
-                Excluir modelo personalizado
+                Excluir meu modelo
               </button>
 
               <input ref={inputModeloRef} type="file" accept=".docx" className="hidden" onChange={subirNovoModelo} />
 
               {mensagemModelo ? <p className="text-xs text-blue-100/90">{mensagemModelo}</p> : null}
-            </div>
-          )}
+          </div>
 
           <div className="pt-6 text-xs opacity-70">SRE Varginha</div>
           <div className="pt-1 text-xs opacity-70">© {new Date().getFullYear()} Desenvolvido por Ataide de Paula Paiva - Todos os Direitos Reservados</div>
@@ -758,6 +967,148 @@ export default function Dashboard() {
               </div>
             )}
 
+            {activeTab === "users" && isAdmin && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-slate-800">Cadastrar novo usuário</h3>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      placeholder="Usuário"
+                      value={novoUsuario}
+                      onChange={(e) => setNovoUsuario(e.target.value)}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      placeholder="Senha"
+                      type="password"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                    />
+                    <select
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={novoPerfil}
+                      onChange={(e) => setNovoPerfil(e.target.value === "admin" ? "admin" : "user")}
+                    >
+                      <option value="user">Usuário</option>
+                      <option value="admin">Administrador</option>
+                    </select>
+                    <button
+                      className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
+                      type="button"
+                      onClick={criarNovoUsuario}
+                    >
+                      Criar usuário
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-800">Usuários cadastrados</h3>
+                    <button
+                      type="button"
+                      onClick={carregarUsuariosSistema}
+                      className="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+                    >
+                      Atualizar lista
+                    </button>
+                  </div>
+
+                  {mensagemUsuarios ? (
+                    <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">{mensagemUsuarios}</p>
+                  ) : null}
+
+                  <div className="overflow-auto rounded-lg border border-slate-200">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-100 text-left text-slate-700">
+                          <th className="px-3 py-2">Usuário</th>
+                          <th className="px-3 py-2">Perfil</th>
+                          <th className="px-3 py-2">Senha</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usuariosSistema.map((usuario) => (
+                          <tr key={usuario.id} className="border-t border-slate-200">
+                            <td className="px-3 py-2">{usuario.usuario}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                                  value={perfilEdicao[usuario.id] || usuario.perfil}
+                                  onChange={(e) =>
+                                    setPerfilEdicao((anterior) => ({
+                                      ...anterior,
+                                      [usuario.id]: e.target.value === "admin" ? "admin" : "user",
+                                    }))
+                                  }
+                                  disabled={salvandoUsuarioId === usuario.id}
+                                >
+                                  <option value="user">Usuário</option>
+                                  <option value="admin">Administrador</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => salvarPerfilUsuario(usuario)}
+                                  className="rounded-lg bg-blue-700 px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-blue-800 disabled:opacity-60"
+                                  disabled={salvandoUsuarioId === usuario.id}
+                                >
+                                  Salvar
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="password"
+                                  placeholder="Nova senha"
+                                  className="w-32 rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                                  value={senhaEdicao[usuario.id] || ""}
+                                  onChange={(e) =>
+                                    setSenhaEdicao((anterior) => ({
+                                      ...anterior,
+                                      [usuario.id]: e.target.value,
+                                    }))
+                                  }
+                                  disabled={salvandoUsuarioId === usuario.id}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => salvarSenhaUsuario(usuario)}
+                                  className="rounded-lg bg-indigo-700 px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-indigo-800 disabled:opacity-60"
+                                  disabled={salvandoUsuarioId === usuario.id}
+                                >
+                                  Trocar
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">{usuario.ativo ? "Ativo" : "Inativo"}</td>
+                            <td className="px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => alternarStatusUsuario(usuario)}
+                                className={cn(
+                                  "rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors",
+                                  usuario.ativo ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"
+                                )}
+                                disabled={salvandoUsuarioId === usuario.id}
+                              >
+                                {usuario.ativo ? "Desativar" : "Ativar"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {carregandoUsuarios ? <p className="mt-3 text-xs text-slate-500">Carregando usuários...</p> : null}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

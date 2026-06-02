@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:usuarios": "node scripts/seed-usuarios.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
