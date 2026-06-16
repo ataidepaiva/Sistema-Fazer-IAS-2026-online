@@ -7,18 +7,12 @@ interface OfflineAuthRecord {
   atualizadoEm: string
 }
 
-export interface OfflineModelRecord {
+interface OfflineModelRecord {
   usuario: string
   nomeArquivo: string
   mimeType: string
   base64: string
   salvoEm: string
-}
-
-export interface OfflineUserRecord {
-  usuario: string
-  perfil: PerfilOffline
-  atualizadoEm: string
 }
 
 const CHAVE_AUTH = "sinfo-offline-auth"
@@ -64,18 +58,6 @@ function lerAuthMap() {
   } catch {
     return {} as Record<string, OfflineAuthRecord>
   }
-}
-
-export function listarUsuariosOfflineDisponiveis(): OfflineUserRecord[] {
-  const authMap = lerAuthMap()
-
-  return Object.values(authMap)
-    .map((registro) => ({
-      usuario: registro.usuario,
-      perfil: registro.perfil,
-      atualizadoEm: registro.atualizadoEm,
-    }))
-    .sort((a, b) => a.usuario.localeCompare(b.usuario, "pt-BR"))
 }
 
 function salvarAuthMap(valor: Record<string, OfflineAuthRecord>) {

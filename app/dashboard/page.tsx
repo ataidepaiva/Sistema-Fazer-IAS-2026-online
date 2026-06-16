@@ -772,14 +772,6 @@ export default function Dashboard() {
             Preparar Lauda
           </Link>
 
-          <Link
-            href="/offline"
-            className="text-left px-4 py-3 rounded-xl flex items-center gap-2 transition-all font-medium text-blue-100 hover:bg-blue-800/80"
-          >
-            <FileText size={16} />
-            Diagnóstico Offline
-          </Link>
-
           {isAdmin && (
             <button
               onClick={() => setActiveTab("users")}

@@ -151,9 +151,6 @@ export default function LoginPage() {
             <Link href="/" className={styles.secondaryLink}>
               Voltar para a página inicial
             </Link>
-            <Link href="/offline" className={styles.secondaryLink}>
-              Ver diagnóstico offline
-            </Link>
             <p className={styles.helpText}>Acesso restrito a usuários autorizados</p>
           </div>
         </section>
