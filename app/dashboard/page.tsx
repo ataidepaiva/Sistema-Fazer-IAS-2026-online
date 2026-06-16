@@ -66,41 +66,6 @@ export default function Dashboard() {
   const inicioGeracaoRef = useRef<number | null>(null)
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
 
-  const carregarPerfilSessao = useCallback(async () => {
-    const perfilCookie = document.cookie
-      .split("; ")
-      .find((item) => item.startsWith("sinfo-role="))
-      ?.split("=")[1]
-
-    if (!navigator.onLine) {
-      const adminOffline = perfilCookie === "admin"
-      setIsAdmin(adminOffline)
-      gravarCookiePerfilOffline(adminOffline ? "admin" : "user")
-      return
-    }
-
-    try {
-      const resposta = await fetch("/api/sessao", { cache: "no-store" })
-
-      if (!resposta.ok) {
-        const adminFallback = perfilCookie === "admin"
-        setIsAdmin(adminFallback)
-        gravarCookiePerfilOffline(adminFallback ? "admin" : "user")
-        return
-      }
-
-      const json = await resposta.json().catch(() => null)
-      const adminServidor = json?.perfil === "admin"
-
-      setIsAdmin(adminServidor)
-      gravarCookiePerfilOffline(adminServidor ? "admin" : "user")
-    } catch {
-      const adminFallback = perfilCookie === "admin"
-      setIsAdmin(adminFallback)
-      gravarCookiePerfilOffline(adminFallback ? "admin" : "user")
-    }
-  }, [])
-
   const carregarStatusModelo = useCallback(async () => {
     const usuarioOffline = obterUsuarioOfflineAtivo()
 
@@ -140,12 +105,17 @@ export default function Dashboard() {
   useEffect(() => {
     setEstaOnline(typeof navigator === "undefined" ? true : navigator.onLine)
 
-    void carregarPerfilSessao()
+    const perfil = document.cookie
+      .split("; ")
+      .find((item) => item.startsWith("sinfo-role="))
+      ?.split("=")[1]
+
+    setIsAdmin(perfil === "admin")
+    gravarCookiePerfilOffline(perfil === "admin" ? "admin" : "user")
     void carregarStatusModelo()
 
     const atualizarConectividade = () => {
       setEstaOnline(navigator.onLine)
-      void carregarPerfilSessao()
       void carregarStatusModelo()
     }
 
@@ -156,7 +126,7 @@ export default function Dashboard() {
       window.removeEventListener("online", atualizarConectividade)
       window.removeEventListener("offline", atualizarConectividade)
     }
-  }, [carregarPerfilSessao, carregarStatusModelo])
+  }, [carregarStatusModelo])
 
   useEffect(() => {
     if (!isAdmin) {
