@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-const HOST_CANONICO = "sistema-fazer-ias-2026-online-six.vercel.app"
+const HOST_CANONICO = (process.env.NEXT_PUBLIC_CANONICAL_HOST || "sistema-fazer-ias-2026-online.vercel.app").toLowerCase()
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
