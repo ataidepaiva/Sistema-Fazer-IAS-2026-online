@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useEffectEvent, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react"
+import { Fragment, useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -66,41 +66,7 @@ export default function Dashboard() {
   const inicioGeracaoRef = useRef<number | null>(null)
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
 
-  useEffect(() => {
-    setEstaOnline(typeof navigator === "undefined" ? true : navigator.onLine)
-
-    const perfil = document.cookie
-      .split("; ")
-      .find((item) => item.startsWith("sinfo-role="))
-      ?.split("=")[1]
-
-    setIsAdmin(perfil === "admin")
-    gravarCookiePerfilOffline(perfil === "admin" ? "admin" : "user")
-    void carregarStatusModelo()
-
-    const atualizarConectividade = () => {
-      setEstaOnline(navigator.onLine)
-      void carregarStatusModelo()
-    }
-
-    window.addEventListener("online", atualizarConectividade)
-    window.addEventListener("offline", atualizarConectividade)
-
-    return () => {
-      window.removeEventListener("online", atualizarConectividade)
-      window.removeEventListener("offline", atualizarConectividade)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!isAdmin) {
-      return
-    }
-
-    void carregarUsuariosSistema()
-  }, [isAdmin])
-
-  const carregarStatusModelo = useEffectEvent(async () => {
+  const carregarStatusModelo = useCallback(async () => {
     const usuarioOffline = obterUsuarioOfflineAtivo()
 
     if (!navigator.onLine) {
@@ -134,7 +100,41 @@ export default function Dashboard() {
         setNomeModeloAtivo(modeloOffline.nomeArquivo)
       }
     }
-  })
+  }, [])
+
+  useEffect(() => {
+    setEstaOnline(typeof navigator === "undefined" ? true : navigator.onLine)
+
+    const perfil = document.cookie
+      .split("; ")
+      .find((item) => item.startsWith("sinfo-role="))
+      ?.split("=")[1]
+
+    setIsAdmin(perfil === "admin")
+    gravarCookiePerfilOffline(perfil === "admin" ? "admin" : "user")
+    void carregarStatusModelo()
+
+    const atualizarConectividade = () => {
+      setEstaOnline(navigator.onLine)
+      void carregarStatusModelo()
+    }
+
+    window.addEventListener("online", atualizarConectividade)
+    window.addEventListener("offline", atualizarConectividade)
+
+    return () => {
+      window.removeEventListener("online", atualizarConectividade)
+      window.removeEventListener("offline", atualizarConectividade)
+    }
+  }, [carregarStatusModelo])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return
+    }
+
+    void carregarUsuariosSistema()
+  }, [isAdmin])
 
   async function sincronizarModeloAtualOffline() {
     if (!navigator.onLine) {
