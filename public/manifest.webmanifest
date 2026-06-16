@@ -1,0 +1,22 @@
+{
+  "name": "Sistema de Informativos",
+  "short_name": "SInfo",
+  "description": "Processamento e geração de documentos com suporte offline.",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#eff6ff",
+  "theme_color": "#0f172a",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/logo-sre-varginha.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-sre-varginha.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
