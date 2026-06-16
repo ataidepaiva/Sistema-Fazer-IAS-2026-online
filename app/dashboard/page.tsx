@@ -1,22 +1,10 @@
 "use client"
 
-import { Fragment, useEffect, useEffectEvent, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react"
+import { Fragment, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { processarTexto } from "@/lib/parser"
-import { gerarPacoteOffline } from "@/lib/offline-doc"
-import {
-  baixarBlob,
-  base64ParaUint8Array,
-  excluirModeloOffline,
-  gravarCookiePerfilOffline,
-  limparSessaoOfflineLocal,
-  lerModeloOffline,
-  obterUsuarioOfflineAtivo,
-  salvarModeloOffline,
-} from "@/lib/offline-client"
 import { FileText, Edit3, Download, ClipboardList, ScrollText, LogOut, Menu, ChevronRight, Upload, Trash2, Users } from "lucide-react"
 
 interface Registro {
@@ -52,7 +40,6 @@ export default function Dashboard() {
   const [tempoDecorridoSegundos, setTempoDecorridoSegundos] = useState(0)
   const [mensagemModelo, setMensagemModelo] = useState("")
   const [nomeModeloAtivo, setNomeModeloAtivo] = useState("modelo.docx")
-  const [estaOnline, setEstaOnline] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [usuariosSistema, setUsuariosSistema] = useState<UsuarioSistema[]>([])
   const [carregandoUsuarios, setCarregandoUsuarios] = useState(false)
@@ -67,29 +54,13 @@ export default function Dashboard() {
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    setEstaOnline(typeof navigator === "undefined" ? true : navigator.onLine)
-
     const perfil = document.cookie
       .split("; ")
       .find((item) => item.startsWith("sinfo-role="))
       ?.split("=")[1]
 
     setIsAdmin(perfil === "admin")
-    gravarCookiePerfilOffline(perfil === "admin" ? "admin" : "user")
     void carregarStatusModelo()
-
-    const atualizarConectividade = () => {
-      setEstaOnline(navigator.onLine)
-      void carregarStatusModelo()
-    }
-
-    window.addEventListener("online", atualizarConectividade)
-    window.addEventListener("offline", atualizarConectividade)
-
-    return () => {
-      window.removeEventListener("online", atualizarConectividade)
-      window.removeEventListener("offline", atualizarConectividade)
-    }
   }, [])
 
   useEffect(() => {
@@ -100,23 +71,11 @@ export default function Dashboard() {
     void carregarUsuariosSistema()
   }, [isAdmin])
 
-  const carregarStatusModelo = useEffectEvent(async () => {
-    const usuarioOffline = obterUsuarioOfflineAtivo()
-
-    if (!navigator.onLine) {
-      const modeloOffline = lerModeloOffline(usuarioOffline)
-      setNomeModeloAtivo(modeloOffline?.nomeArquivo || "modelo.docx")
-      return
-    }
-
+  async function carregarStatusModelo() {
     try {
       const resposta = await fetch("/api/modelo?status=1")
 
       if (!resposta.ok) {
-        const modeloOffline = lerModeloOffline(usuarioOffline)
-        if (modeloOffline) {
-          setNomeModeloAtivo(modeloOffline.nomeArquivo)
-        }
         return
       }
 
@@ -126,69 +85,8 @@ export default function Dashboard() {
       if (typeof nomeArquivo === "string" && nomeArquivo.trim()) {
         setNomeModeloAtivo(nomeArquivo)
       }
-
-      void sincronizarModeloAtualOffline()
     } catch {
-      const modeloOffline = lerModeloOffline(usuarioOffline)
-      if (modeloOffline) {
-        setNomeModeloAtivo(modeloOffline.nomeArquivo)
-      }
-    }
-  })
-
-  async function sincronizarModeloAtualOffline() {
-    if (!navigator.onLine) {
-      return
-    }
-
-    try {
-      const resposta = await fetch("/api/modelo")
-
-      if (!resposta.ok) {
-        return
-      }
-
-      const blob = await resposta.blob()
-      const disposition = resposta.headers.get("Content-Disposition") || ""
-      const matchUtf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)
-      const match = disposition.match(/filename="([^"]+)"/i)
-      const nomeArquivo = matchUtf8?.[1] ? decodeURIComponent(matchUtf8[1]) : match?.[1] || "modelo.docx"
-      const usuario = obterUsuarioOfflineAtivo()
-
-      if (usuario) {
-        await salvarModeloOffline({
-          usuario,
-          nomeArquivo,
-          mimeType: blob.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          arquivo: blob,
-        })
-      }
-    } catch {
-      // Cache offline é melhor esforço.
-    }
-  }
-
-  async function obterModeloOfflineOuPadrao() {
-    const usuario = obterUsuarioOfflineAtivo()
-    const modeloOffline = lerModeloOffline(usuario)
-
-    if (modeloOffline) {
-      return {
-        nomeArquivo: modeloOffline.nomeArquivo,
-        bytes: base64ParaUint8Array(modeloOffline.base64),
-      }
-    }
-
-    const resposta = await fetch("/modelo.docx")
-
-    if (!resposta.ok) {
-      throw new Error("Nenhum modelo offline está disponível neste navegador")
-    }
-
-    const blob = await resposta.blob()
-    return {
-      nomeArquivo: "modelo.docx",
-      bytes: new Uint8Array(await blob.arrayBuffer()),
+      // Mantem fallback local quando a consulta de status falha.
     }
   }
 
@@ -214,13 +112,6 @@ export default function Dashboard() {
     if (!texto.trim()) return
 
     setErro("")
-
-    if (!navigator.onLine) {
-      const json = processarTexto(texto)
-      setDados(json)
-      setActiveTab("edit")
-      return
-    }
 
     const res = await fetch("/api/processar", {
       method: "POST",
@@ -300,20 +191,6 @@ export default function Dashboard() {
   async function baixarModelo() {
     setMensagemModelo("Baixando modelo...")
 
-    if (!navigator.onLine) {
-      const modeloOffline = lerModeloOffline(obterUsuarioOfflineAtivo())
-
-      if (!modeloOffline) {
-        setMensagemModelo("Sem rede e sem modelo salvo neste navegador")
-        return
-      }
-
-      const blob = new Blob([base64ParaUint8Array(modeloOffline.base64)], { type: modeloOffline.mimeType })
-      baixarBlob(blob, modeloOffline.nomeArquivo)
-      setMensagemModelo(`Download offline concluído: ${modeloOffline.nomeArquivo}`)
-      return
-    }
-
     try {
       const resposta = await fetch("/api/modelo")
       const json = await resposta.clone().json().catch(() => null)
@@ -329,17 +206,12 @@ export default function Dashboard() {
       const match = disposition.match(/filename="([^"]+)"/i)
       const nomeArquivo = matchUtf8?.[1] ? decodeURIComponent(matchUtf8[1]) : match?.[1] || "modelo.docx"
 
-      const usuario = obterUsuarioOfflineAtivo()
-      if (usuario) {
-        await salvarModeloOffline({
-          usuario,
-          nomeArquivo,
-          mimeType: blob.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          arquivo: blob,
-        })
-      }
-
-      baixarBlob(blob, nomeArquivo)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = nomeArquivo
+      a.click()
+      window.URL.revokeObjectURL(url)
 
       setMensagemModelo(`Download concluído: ${nomeArquivo}`)
     } catch {
@@ -351,23 +223,6 @@ export default function Dashboard() {
     const arquivo = event.target.files?.[0]
 
     if (!arquivo) return
-
-    const usuario = obterUsuarioOfflineAtivo()
-    if (usuario) {
-      await salvarModeloOffline({
-        usuario,
-        nomeArquivo: arquivo.name,
-        mimeType: arquivo.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        arquivo,
-      })
-      setNomeModeloAtivo(arquivo.name)
-    }
-
-    if (!navigator.onLine) {
-      setMensagemModelo(`Modelo salvo offline neste navegador: ${arquivo.name}`)
-      event.target.value = ""
-      return
-    }
 
     const formData = new FormData()
     formData.append("arquivo", arquivo)
@@ -407,14 +262,6 @@ export default function Dashboard() {
     }
 
     setMensagemModelo("Excluindo modelo personalizado...")
-
-    excluirModeloOffline(obterUsuarioOfflineAtivo())
-
-    if (!navigator.onLine) {
-      setNomeModeloAtivo("modelo.docx")
-      setMensagemModelo("Modelo offline removido. O sistema usará o modelo padrão em cache.")
-      return
-    }
 
     try {
       const resposta = await fetch("/api/modelo", {
@@ -617,12 +464,7 @@ export default function Dashboard() {
   }
 
   async function sair() {
-    limparSessaoOfflineLocal()
-
-    if (navigator.onLine) {
-      await fetch("/api/logout", { method: "POST" })
-    }
-
+    await fetch("/api/logout", { method: "POST" })
     router.push("/login")
     router.refresh()
   }
@@ -635,14 +477,6 @@ export default function Dashboard() {
     inicioGeracaoRef.current = Date.now()
 
     try {
-      if (!navigator.onLine) {
-        const modelo = await obterModeloOfflineOuPadrao()
-        const pacote = await gerarPacoteOffline(modelo.bytes, dados)
-        baixarBlob(pacote.blob, pacote.nomeArquivo)
-        setProgressoGeracao(100)
-        return
-      }
-
       const res = await fetch("/api/gerar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -855,15 +689,6 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 p-5 md:p-6">
-            <div className={cn(
-              "mb-4 rounded-xl border px-4 py-3 text-sm",
-              estaOnline ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"
-            )}>
-              {estaOnline
-                ? "Modo online: o sistema sincroniza sessão e modelo com o servidor."
-                : "Modo offline: processamento e exportação funcionam localmente; se houver vários registros, o download sai em ZIP com um DOCX por página."}
-            </div>
-
             {erro && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {erro}

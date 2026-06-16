@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { autenticarOffline, gravarCookiePerfilOffline, salvarCredenciaisOffline } from "@/lib/offline-client"
 import styles from "./page.module.css"
 
 export default function LoginPage() {
@@ -14,21 +13,6 @@ export default function LoginPage() {
   const [senha, setSenha] = useState("")
   const [erro, setErro] = useState("")
   const [carregando, setCarregando] = useState(false)
-  const [estaOnline, setEstaOnline] = useState(true)
-
-  useEffect(() => {
-    setEstaOnline(typeof navigator === "undefined" ? true : navigator.onLine)
-
-    const atualizarStatus = () => setEstaOnline(navigator.onLine)
-
-    window.addEventListener("online", atualizarStatus)
-    window.addEventListener("offline", atualizarStatus)
-
-    return () => {
-      window.removeEventListener("online", atualizarStatus)
-      window.removeEventListener("offline", atualizarStatus)
-    }
-  }, [])
 
   async function entrar(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -36,20 +20,6 @@ export default function LoginPage() {
     setCarregando(true)
 
     try {
-      if (!navigator.onLine) {
-        const sessaoOffline = await autenticarOffline(usuario, senha)
-
-        if (!sessaoOffline) {
-          setErro("Sem rede: use um usuário que já tenha entrado neste navegador anteriormente")
-          return
-        }
-
-        gravarCookiePerfilOffline(sessaoOffline.perfil)
-        router.push("/dashboard")
-        router.refresh()
-        return
-      }
-
       const resposta = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,12 +31,6 @@ export default function LoginPage() {
         setErro(json?.error || "Falha ao entrar no sistema")
         return
       }
-
-      const json = await resposta.json().catch(() => null)
-      const perfil = json?.perfil === "admin" ? "admin" : "user"
-      const nomeUsuario = typeof json?.usuario === "string" && json.usuario.trim() ? json.usuario.trim() : usuario.trim()
-
-      await salvarCredenciaisOffline({ usuario: nomeUsuario, senha, perfil })
 
       router.push("/dashboard")
       router.refresh()
@@ -110,8 +74,6 @@ export default function LoginPage() {
               <p className={styles.tip}>Credenciais de acesso configuradas para uso interno</p>
             </div>
           </div>
-
-          {!estaOnline ? <p className={styles.tip}>Modo offline ativo: o último acesso deste navegador pode continuar trabalhando sem rede.</p> : null}
 
           <form onSubmit={entrar} className={styles.form}>
             <label className={styles.label}>

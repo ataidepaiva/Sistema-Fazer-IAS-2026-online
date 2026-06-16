@@ -4,8 +4,6 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { baixarBlob, limparSessaoOfflineLocal } from "@/lib/offline-client"
-import { montarLaudaOffline, obterNomeLaudaOffline } from "@/lib/offline-doc"
 import { ArrowLeft, Download, FileText, ClipboardList, LogOut, Menu, ChevronRight, Upload } from "lucide-react"
 
 export default function Lauda() {
@@ -16,23 +14,8 @@ export default function Lauda() {
   const [progresso, setProgresso] = useState(0)
   const [tempoDecorrido, setTempoDecorrido] = useState(0)
   const [mensagemModelo, setMensagemModelo] = useState("")
-  const [estaOnline, setEstaOnline] = useState(true)
   const inicioRef = useRef<number | null>(null)
   const inputModeloRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => {
-    setEstaOnline(typeof navigator === "undefined" ? true : navigator.onLine)
-
-    const atualizarStatus = () => setEstaOnline(navigator.onLine)
-
-    window.addEventListener("online", atualizarStatus)
-    window.addEventListener("offline", atualizarStatus)
-
-    return () => {
-      window.removeEventListener("online", atualizarStatus)
-      window.removeEventListener("offline", atualizarStatus)
-    }
-  }, [])
 
   useEffect(() => {
     if (!gerando) return
@@ -114,12 +97,7 @@ export default function Lauda() {
   }
 
   async function sair() {
-    limparSessaoOfflineLocal()
-
-    if (navigator.onLine) {
-      await fetch("/api/logout", { method: "POST" })
-    }
-
+    await fetch("/api/logout", { method: "POST" })
     router.push("/login")
     router.refresh()
   }
@@ -133,21 +111,6 @@ export default function Lauda() {
     inicioRef.current = Date.now()
 
     try {
-      if (!navigator.onLine) {
-        const respostaModelo = await fetch("/modelo-lauda.rtf")
-
-        if (!respostaModelo.ok) {
-          throw new Error("Modelo de lauda offline indisponível")
-        }
-
-        const modeloRtf = await respostaModelo.text()
-        const conteudo = montarLaudaOffline(modeloRtf, texto)
-        const blob = new Blob([conteudo], { type: "application/rtf" })
-        baixarBlob(blob, obterNomeLaudaOffline())
-        setProgresso(100)
-        return
-      }
-
       const res = await fetch("/api/lauda", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -293,12 +256,6 @@ export default function Lauda() {
 
           <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 p-5 md:p-6">
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className={`${estaOnline ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"} mb-4 rounded-xl border px-4 py-3 text-sm`}>
-                {estaOnline
-                  ? "Modo online: a lauda pode ser gerada pelo servidor e também fica pronta para uso offline depois do cache inicial."
-                  : "Modo offline: a lauda será montada localmente no navegador usando o modelo em cache."}
-              </div>
-
               <label className="block text-sm font-medium text-slate-600 mb-2">Texto da Lauda</label>
 
               <textarea
