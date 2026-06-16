@@ -2,6 +2,7 @@ const CACHE_NAME = "sinfo-offline-v1"
 const APP_SHELL = [
   "/",
   "/login",
+  "/offline",
   "/dashboard",
   "/lauda",
   "/manifest.webmanifest",

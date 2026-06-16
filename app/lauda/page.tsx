@@ -221,6 +221,14 @@ export default function Lauda() {
             <FileText size={16} />
             Preparar Lauda
           </div>
+
+          <Link
+            href="/offline"
+            className="text-left px-4 py-3 rounded-xl flex items-center gap-2 transition-all font-medium text-blue-100 hover:bg-blue-800/80"
+          >
+            <Download size={16} />
+            Diagnóstico Offline
+          </Link>
         </nav>
 
         <div className="mt-auto pt-6">
